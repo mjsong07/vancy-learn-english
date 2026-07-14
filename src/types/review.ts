@@ -16,5 +16,6 @@ export interface ReviewLesson {
   theme: string;
   summary: string;
   teacherText: string;
+  dailyContent: string;
   items: ReviewItem[];
 }

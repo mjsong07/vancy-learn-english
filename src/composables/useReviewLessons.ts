@@ -33,14 +33,23 @@ function normalizeLessons(rawLessons: ReviewLesson[]) {
 
   return rawLessons
     .filter((lesson) => lesson?.id && lesson?.title)
-    .map((lesson) => ({
-      ...lesson,
-      dateLabel: lesson.dateLabel || "复习日",
-      theme: lesson.theme || "English Review",
-      summary: lesson.summary || "",
-      teacherText: lesson.teacherText || "",
-      items: normalizeLessonItems(lesson.items, fallback[0].items)
-    }));
+    .map((lesson) => {
+      const seedLesson = fallback.find((candidate) => candidate.id === lesson.id);
+      return {
+        ...lesson,
+        dateLabel: lesson.dateLabel || "复习日",
+        theme: lesson.theme || "English Review",
+        summary: lesson.summary || "",
+        teacherText: lesson.teacherText || "",
+        dailyContent:
+          seedLesson?.dailyContent ||
+          lesson.dailyContent?.trim() ||
+          lesson.teacherText ||
+          lesson.summary ||
+          "暂无今日学习内容。",
+        items: normalizeLessonItems(lesson.items, fallback[0].items)
+      };
+    });
 }
 
 function normalizeLessonItems(items: ReviewItem[] | undefined, fallbackItems: ReviewItem[]) {
@@ -50,7 +59,9 @@ function normalizeLessonItems(items: ReviewItem[] | undefined, fallbackItems: Re
 }
 
 const seedLessonMigrations = [
-  { version: 3, lessonId: "lesson-unit-6-fruits", replaceExisting: true }
+  { version: 3, lessonId: "lesson-unit-6-fruits", replaceExisting: true },
+  { version: 10, lessonId: "lesson-letter-x", replaceExisting: true },
+  { version: 11, lessonId: "lesson-smoothie-diy", replaceExisting: true }
 ] as const;
 
 const legacyGroupedLetterLessonIds = new Set(["lesson-letter-xyz-review", "lesson-letter-z"]);
@@ -107,7 +118,7 @@ function loadReviewLessons() {
     migratedLessons = restoreLessonsFromTeacherText(migratedLessons);
   }
 
-  if (storedVersion < 8) {
+  if (storedVersion < 9) {
     const refreshedSeedLessons = seedLessons.filter((lesson) =>
       refreshedSeedLessonIds.has(lesson.id)
     );
@@ -224,6 +235,7 @@ export function useReviewLessons() {
       theme: payload.theme.trim() || "English Review",
       summary: payload.summary.trim() || "课后复习内容",
       teacherText: payload.teacherText.trim(),
+      dailyContent: payload.teacherText.trim() || payload.summary.trim() || "暂无今日学习内容。",
       items: parsedItems.length ? parsedItems : [buildReviewItem("hello", "你好")]
     };
     lessons.value = [lesson, ...lessons.value];

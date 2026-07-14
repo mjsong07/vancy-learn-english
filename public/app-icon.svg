@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Vancy English Review">
+  <rect width="512" height="512" rx="112" fill="#2d63e8"/>
+  <path d="M118 136c0-18 14-32 32-32h210c18 0 32 14 32 32v240c0 18-14 32-32 32H150c-18 0-32-14-32-32V136Z" fill="#ffffff"/>
+  <path d="M154 132c0-10 8-18 18-18h166c10 0 18 8 18 18v220c0 10-8 18-18 18H172c-10 0-18-8-18-18V132Z" fill="#f5f8ff"/>
+  <path d="M190 190h132v26H190v-26Zm0 54h132v26H190v-26Zm0 54h84v26h-84v-26Z" fill="#2d63e8"/>
+  <circle cx="360" cy="366" r="68" fill="#ffca3a"/>
+  <path d="M332 363h56v18h-56v-18Zm28-43 38 76h-22l-8-18h-36l-8 18h-22l38-76h20Zm-20 40h20l-10-23-10 23Z" fill="#1d2340"/>
+</svg>

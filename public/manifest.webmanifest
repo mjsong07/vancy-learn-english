@@ -1,0 +1,18 @@
+{
+  "name": "Vancy 英语复习",
+  "short_name": "Vancy 英语",
+  "description": "Vancy 英语复习离线应用",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f8fbff",
+  "theme_color": "#2d63e8",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

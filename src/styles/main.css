@@ -106,7 +106,7 @@ textarea {
 
 .brand-card p,
 .lesson-day-card small,
-.teacher-content,
+.lesson-learning-empty,
 .panel-title-row p,
 .panel-title-row span,
 .review-meta-row,
@@ -214,7 +214,7 @@ textarea {
   width: 100%;
   min-width: 0;
   min-height: auto;
-  padding: 10px;
+  padding: 72px 10px 10px;
   border: 0;
   border-radius: 8px;
   background: rgba(207, 227, 247, 0.96);
@@ -379,25 +379,31 @@ textarea {
   display: flex;
   flex: 0 0 54px;
   align-items: flex-end;
+  justify-content: center;
   width: 100%;
   height: 54px;
   min-width: 0;
+  overflow: hidden;
+  padding-inline: 8px;
   padding-top: 12px;
 }
 
 .letter-row {
   display: grid;
-  flex: 0 0 42px;
-  gap: 6px;
-  width: 100%;
+  flex: 0 1 auto;
+  grid-auto-columns: 28px;
+  grid-auto-flow: column;
+  gap: 5px;
+  width: max-content;
+  max-width: 100%;
   height: 42px;
-  margin: 0;
+  margin: 0 auto;
 }
 
 .letter-pill {
   display: grid;
   place-items: center;
-  width: 100%;
+  width: 28px;
   min-width: 0;
   height: 42px;
   padding: 0;
@@ -418,7 +424,12 @@ textarea {
 }
 
 .letter-row.dense {
+  grid-auto-columns: 24px;
   gap: 4px;
+}
+
+.letter-row.dense .letter-pill {
+  width: 24px;
 }
 
 .letter-row.dense .letter-pill strong {
@@ -426,7 +437,12 @@ textarea {
 }
 
 .letter-row.compact {
+  grid-auto-columns: 21px;
   gap: 3px;
+}
+
+.letter-row.compact .letter-pill {
+  width: 21px;
 }
 
 .letter-row.compact .letter-pill strong {
@@ -502,12 +518,16 @@ textarea {
 }
 
 .review-settings-trigger {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 30;
   display: grid;
   flex: 0 0 52px;
   grid-template-columns: 32px minmax(0, 1fr) 18px;
   gap: 8px;
   align-items: center;
-  width: 100%;
+  width: min(calc(100vw - 36px), 394px);
   height: 52px;
   min-height: 52px;
   margin-bottom: 10px;
@@ -516,7 +536,9 @@ textarea {
   border-radius: 8px;
   background: var(--blue-soft);
   color: var(--primary);
+  box-shadow: 0 10px 24px rgba(57, 87, 123, 0.12);
   text-align: left;
+  transform: translateX(-50%);
   cursor: pointer;
 }
 
@@ -620,6 +642,11 @@ textarea {
   gap: 14px;
   align-items: center;
   justify-content: space-between;
+  min-height: 50px;
+}
+
+.panel-title-row > div {
+  min-width: 0;
 }
 
 .panel-title-row.compact {
@@ -628,8 +655,11 @@ textarea {
 
 .panel-title-row h2,
 .drawer-title h2 {
+  overflow: hidden;
   font-size: 1.45rem;
   line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-title-row h3 {
@@ -645,27 +675,74 @@ textarea {
   text-transform: uppercase;
 }
 
-.star-badge {
-  display: grid;
-  place-items: center;
+.daily-content-button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  width: 42px;
   height: 42px;
+  padding: 0 10px;
+  border: 1px solid rgba(47, 102, 239, 0.3);
   border-radius: 8px;
-  background: #fff7df;
-  color: var(--yellow);
+  background: var(--blue-soft);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
 }
 
-.teacher-content {
-  margin: 14px 0 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: #f7fbff;
+.daily-content-button:hover {
+  border-color: rgba(47, 102, 239, 0.56);
+  background: #e2f0ff;
+}
+
+.daily-content-button span {
+  color: inherit;
+  white-space: nowrap;
+}
+
+.lesson-learning-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.lesson-learning-list p,
+.lesson-learning-empty {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lesson-learning-list p {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 860;
+  line-height: 1.35;
+}
+
+.lesson-learning-list span {
+  min-width: 0;
+  color: var(--ink);
+}
+
+.lesson-learning-list small {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 780;
+  line-height: 1.35;
+}
+
+.lesson-learning-empty {
+  margin-top: 12px;
   font-size: 0.9rem;
   font-weight: 760;
-  line-height: 1.58;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .lesson-form .el-input__wrapper,
@@ -743,6 +820,86 @@ textarea {
 
 .row-actions .el-button {
   color: rgba(102, 115, 134, 0.78);
+}
+
+.daily-content-drawer.el-drawer {
+  right: auto;
+  left: 50%;
+  width: min(100%, 430px);
+  margin: 0;
+  overflow: hidden;
+  border-radius: 12px 12px 0 0;
+  transform: translateX(-50%);
+  box-shadow: 0 -18px 50px rgba(32, 39, 53, 0.2);
+}
+
+.daily-content-drawer .el-drawer__body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.daily-content-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--paper);
+}
+
+.daily-content-header {
+  display: flex;
+  flex: 0 0 64px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.daily-content-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.daily-content-title strong,
+.daily-content-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-content-title strong {
+  font-size: 1.08rem;
+}
+
+.daily-content-title span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.daily-content-header .el-button {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.daily-content-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  overscroll-behavior-y: contain;
+}
+
+.daily-content-copy {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.94rem;
+  font-weight: 650;
+  line-height: 1.72;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .review-settings-drawer.el-drawer {

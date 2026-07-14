@@ -10,10 +10,10 @@ import {
   Microphone,
   RefreshLeft,
   Setting,
-  StarFilled,
   SwitchButton
 } from "@element-plus/icons-vue";
 import { useReviewLessons } from "./composables/useReviewLessons";
+import { getSeedDailyContent } from "./data/reviewLessons";
 import { getReviewPhonetic } from "./data/reviewPhonetics";
 import { speak } from "./services/speech";
 import type { ReviewItem } from "./types/review";
@@ -38,6 +38,7 @@ const {
 type SettingsSection = "lessons" | "add" | "restore";
 
 const settingsDrawerOpen = ref(false);
+const dailyContentDrawerOpen = ref(false);
 const settingsSection = ref<SettingsSection>("lessons");
 const settingsOptions: Array<{ label: string; value: SettingsSection }> = [
   { label: "复习内容", value: "lessons" },
@@ -103,13 +104,21 @@ const currentPhoneticFontSize = computed(() => {
   return `${Math.min(13, Math.max(10, fittedSize))}px`;
 });
 
-const activeTeacherContent = computed(() => {
-  const teacherText = activeLesson.value?.teacherText.trim();
-  return teacherText || activeLesson.value?.summary || "";
+const activeDailyContent = computed(() => {
+  const lesson = activeLesson.value;
+  if (!lesson) return "暂无今日学习内容。";
+  return (
+    getSeedDailyContent(lesson.id) ||
+    lesson.dailyContent?.trim() ||
+    lesson.teacherText?.trim() ||
+    lesson.summary
+  );
 });
 
-const activeTeacherContentLabel = computed(() => {
-  return activeTeacherContent.value.replace(/\s+\/\s+/g, "\n");
+const currentLearningItems = computed(() => {
+  const lesson = activeLesson.value;
+  if (!lesson) return [];
+  return lesson.items.filter((item) => item.category === "word" || item.category === "sentence");
 });
 
 function speakActiveItem() {
@@ -138,6 +147,12 @@ function openSettings(section: SettingsSection = "lessons") {
 }
 
 function handleSelectLesson(lessonId: string) {
+  if (lessonId === activeLessonId.value) {
+    settingsDrawerOpen.value = false;
+    settingsSection.value = "lessons";
+    return;
+  }
+
   selectLesson(lessonId);
   settingsSection.value = "lessons";
 }
@@ -248,9 +263,6 @@ function resetLessonForm() {
                 dense: currentLetters.length > 7,
                 compact: currentLetters.length > 9
               }"
-              :style="{
-                gridTemplateColumns: `repeat(${currentLetters.length}, minmax(0, 1fr))`
-              }"
               aria-label="字母拆分"
             >
               <button
@@ -304,14 +316,50 @@ function resetLessonForm() {
               <p>{{ activeLesson.theme }}</p>
               <h2>{{ activeLesson.title }}</h2>
             </div>
-            <span class="star-badge">
-              <el-icon><StarFilled /></el-icon>
-            </span>
+            <button
+              class="daily-content-button"
+              type="button"
+              aria-haspopup="dialog"
+              @click="dailyContentDrawerOpen = true"
+            >
+              <el-icon><Calendar /></el-icon>
+              <span>今日学习内容</span>
+            </button>
           </div>
-          <p class="teacher-content">{{ activeTeacherContentLabel }}</p>
+          <div v-if="currentLearningItems.length" class="lesson-learning-list">
+            <p v-for="item in currentLearningItems" :key="item.id">
+              <span>{{ item.english }}</span>
+              <small v-if="item.chinese">{{ item.chinese }}</small>
+            </p>
+          </div>
+          <p v-else class="lesson-learning-empty">暂无单词和句子。</p>
         </section>
       </aside>
     </section>
+
+    <el-drawer
+      v-model="dailyContentDrawerOpen"
+      class="daily-content-drawer"
+      direction="btt"
+      size="88%"
+      :with-header="false"
+      append-to-body
+    >
+      <section class="daily-content-shell" aria-label="今日学习内容">
+        <header class="daily-content-header">
+          <div class="daily-content-title">
+            <strong>今日学习内容</strong>
+            <span>{{ activeLesson?.title }}</span>
+          </div>
+          <el-button :icon="SwitchButton" text @click="dailyContentDrawerOpen = false">
+            关闭
+          </el-button>
+        </header>
+        <div class="daily-content-body">
+          <p class="daily-content-copy">{{ activeDailyContent }}</p>
+        </div>
+      </section>
+    </el-drawer>
 
     <el-drawer
       v-model="settingsDrawerOpen"

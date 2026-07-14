@@ -4,7 +4,7 @@ export const reviewStorageKey = "kid-english-review-lessons-v1";
 export const reviewProgressStorageKey = "kid-english-review-progress-v1";
 export const reviewActiveLessonStorageKey = "kid-english-review-active-lesson-v1";
 export const reviewContentVersionStorageKey = "kid-english-review-content-version-v1";
-export const reviewContentVersion = 8;
+export const reviewContentVersion = 11;
 
 export function createReviewId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -50,16 +50,215 @@ export function dedupeReviewItems(items: ReviewItem[]) {
   });
 }
 
+const seedDailyContent: Record<string, string> = {
+  "lesson-letter-x": `📆【今日学习内容】
+————————————
+👩‍🏫教学重点
+1.唱歌曲《A is for Apple》A-Z(结合歌曲记忆字母发音及相关单词）
+
+2.复习《Super ABC》letter Xx～Zz👇
+1️⃣.字母操 letter Zz
+2️⃣字母大小写
+3️⃣字母发音及相关单词
+
+——相关单词
+1️⃣X-ray X光片
+2️⃣six 六
+3️⃣box 盒子，箱子
+4️⃣ox 公牛
+————
+1️⃣yogurt 酸奶酪
+2️⃣yawn 打哈欠🥱
+3️⃣yak 牦牛
+4️⃣yacht 游艇🛥️
+———
+1️⃣zero 数字0
+2️⃣zoo 动物园
+3️⃣zebra 斑马🦓
+4️⃣zipper 拉链
+
+—重点句型朗读
+ I see an X-ray.
+I have six toys.
+This is my box.
+The ox is big.
+ I like yogurt.
+ I am tired. I yawn.
+The yak is big.
+We see a yacht.
+Zero is a number.
+I go to the zoo.
+I see a zebra.
+ I pull my zipper.
+
+——字母辨认训练
+
+4.课前口语对话
+
+5.书写练习
+————————————
+🌞【家庭作业】:
+🧡口语作业💬
+1️⃣观看外教老师指读视频字母Xx～Zz
+2️⃣.跟读指读视频
+————————————
+[Sun]【今日课堂小结】
+今天进行Xx～Zz的字母总复习，宝贝们的辨音能力有提升哦，继续加油，回去多跟读～@所有人`,
+  "lesson-letter-y": `📆【今日学习内容】
+————————————
+👩‍🏫教学重点
+1.唱歌曲《A is for Apple》A-Z（结合歌曲记忆字母发音及相关单词）
+
+2.学习《Super ABC》letter Yy👇
+1️⃣学习字母操 letter Yy
+2️⃣学习字母大小写
+3️⃣学习字母发音及相关单词
+
+—相关单词
+1️⃣yogurt 酸奶酪
+2️⃣yawn 打哈欠🥱
+3️⃣yak 牦牛
+4️⃣yacht 游艇🛥️
+
+—重点句型👇
+1️⃣Y is for ….
+
+—拓展句型表达：
+1. I like yogurt.
+（我喜欢酸奶酪。）
+2. I am tired. I yawn.
+（我累了，我打哈欠。）
+3. The yak is big.
+（这头牦牛很大。）
+4. We see a yacht.
+（我们看到一艘游艇。）
+
+3.日常口语对话：提升听力能力
+
+4.课堂完成书写
+————————————
+🌞【家庭作业】:
+口语作业💬
+1️⃣观看外教老师字母 Yy 指读视频
+2️⃣跟读指读视频
+————————————
+[Sun]【今日课堂小结】
+今日学习字母 Y，宝贝们要注意 Yy 的大小写和发音，回家多跟读、多复习哦！`,
+  "lesson-letter-z": `📆【今日学习内容】
+————————————
+👩‍🏫教学重点
+1.唱歌曲《A is for Apple》A-Z(结合歌曲记忆字母发音及相关单词）
+
+2.学习《Super ABC》letter Zz👇
+1️⃣学习字母操 letter Zz
+2️⃣学习字母大小写
+3️⃣学习字母发音及相关单词
+
+—相关单词
+1️⃣zero 数字0
+2️⃣zoo 动物园
+3️⃣zebra 斑马🦓
+4️⃣zipper 拉链
+
+—重点句型👇
+1️⃣Z is for ….
+
+—拓展句型表达：
+1. Zero is a number.
+（零是一个数字。）
+2. I go to the zoo.
+（我去动物园。）
+3. I see a zebra.
+（我看到一只斑马。）
+4. I pull my zipper.
+（我拉我的拉链。）
+
+3.日常口语对话：提升听力能力
+
+4.课堂完成书写
+————————————
+🌞【家庭作业】:
+口语作业💬
+1️⃣观看外教老师指读视频
+2️⃣.跟读指读视频
+————————————
+[Sun]【今日课堂小结】
+今日学习字母Z，孩子们回去需要多跟读多复习哦！`,
+  "lesson-unit-6-fruits": `📆【今日学习内容】
+————————————
+👩‍🏫教学目标
+💙学习《Students Book》Unit 6 Fruit 主题词汇：
+1️⃣apple 苹果🍎
+2️⃣pear 梨🍐
+3️⃣orange 橘子🍊
+4️⃣watermelon 西瓜🍉
+
+—拓展单词
+1️⃣pineapple 菠萝🍍
+2️⃣mango 芒果🥭
+
+💙学习句子
+What fruit do you like?
+I like...
+
+🌞【家庭作业】:
+跟读课堂音频，复习水果单词和重点句型。
+————————————
+[Sun]【今日课堂小结】
+同学们今天表现超棒哒！因为周日上冰沙活动课，我们前置教学水果词汇。回家也要多多复习呦！`,
+  "lesson-smoothie-diy": `LG1上课内容🧑‍🏫
+————————
+一、本节课课堂主题🍍
+水果冰沙DIY特色英语实践课，将生活场景与英语学习结合，学习水果、制作工具、健康饮食相关英文词汇与问答句型。
+
+二、本节课学习知识点📖
+1. 核心词汇
+（1）水果 Fruits
+apple 苹果、dragon fruit 火龙果、mango 芒果、kiwifruit 奇异果……
+（2）制作工具&材料 Materials
+ice cube 冰块、sugar / syrup 糖/糖浆、blender 搅拌机、cup 杯子、straw 吸管…
+
+2. 核心问答句型
+3. 询问喜好
+Q：What fruit do you like? 你喜欢什么水果？
+A：I like … 我喜欢……
+
+2. 询问制作材料
+Q：What do we need to make smoothie? 做冰沙我们需要什么？
+A：We need … 我们需要……
+
+三、课堂实操环节
+1. 单词认读：全班看图认读所有水果、工具单词，老师带读纠正发音；
+
+2. 听力输入：外教老师全英文进行冰沙制作的操作
+
+3. DIY手工实践：全员动手制作菠萝冰沙，制作过程中外教引导全程操作与用到的材料；
+
+4. 品尝分享：品尝自制冰沙，用英文描述口感。
+
+四、书写手臂肌肉训练：
+1. 涂色书写：给作业纸上水果、工具图案涂色
+———————
+作业内容✍️
+口语作业：跟读下发作业纸（3遍）`
+};
+
+export function getSeedDailyContent(lessonId: string) {
+  return seedDailyContent[lessonId] || "";
+}
+
 export const seedReviewLessons: ReviewLesson[] = [
   {
     id: "lesson-letter-x",
-    title: "Letter Xx",
+    title: "Letter Xx-Zz 总复习",
     dateLabel: "今日课堂",
     theme: "Super ABC",
-    summary: "字母 Xx、相关单词和课堂重点句型。",
+    summary: "字母 Xx～Zz、相关单词和课堂重点句型。",
     teacherText:
-      "letter Xx / X-ray X光片 / six 六 / box 盒子，箱子 / ox 公牛 / I see an X-ray. / I have six toys. / This is my box. / The ox is big.",
+      "A is for Apple / letter Xx / X-ray X光片 / six 六 / box 盒子，箱子 / ox 公牛 / I see an X-ray. / I have six toys. / This is my box. / The ox is big. / letter Yy / yogurt 酸奶酪 / yawn 打哈欠 / yak 牦牛 / yacht 游艇 / I like yogurt. / I am tired. I yawn. / The yak is big. / We see a yacht. / letter Zz / zero 数字0 / zoo 动物园 / zebra 斑马 / zipper 拉链 / Zero is a number. / I go to the zoo. / I see a zebra. / I pull my zipper.",
+    dailyContent: seedDailyContent["lesson-letter-x"],
     items: [
+      buildReviewItem("A is for Apple", "字母歌曲 A-Z", "歌曲复习", "letter"),
       buildReviewItem("letter Xx", "字母 Xx", "大写 X，小写 x · 字母发音", "letter"),
       buildReviewItem("X-ray", "X 光片"),
       buildReviewItem("six", "六"),
@@ -68,7 +267,25 @@ export const seedReviewLessons: ReviewLesson[] = [
       buildReviewItem("I see an X-ray.", "我看到一张 X 光片。", "重点句型", "sentence"),
       buildReviewItem("I have six toys.", "我有六个玩具。", "重点句型", "sentence"),
       buildReviewItem("This is my box.", "这是我的盒子。", "重点句型", "sentence"),
-      buildReviewItem("The ox is big.", "这头公牛很大。", "重点句型", "sentence")
+      buildReviewItem("The ox is big.", "这头公牛很大。", "重点句型", "sentence"),
+      buildReviewItem("letter Yy", "字母 Yy", "大写 Y，小写 y · 字母发音", "letter"),
+      buildReviewItem("yogurt", "酸奶酪"),
+      buildReviewItem("yawn", "打哈欠"),
+      buildReviewItem("yak", "牦牛"),
+      buildReviewItem("yacht", "游艇"),
+      buildReviewItem("I like yogurt.", "我喜欢酸奶酪。", "重点句型", "sentence"),
+      buildReviewItem("I am tired. I yawn.", "我累了，我打哈欠。", "重点句型", "sentence"),
+      buildReviewItem("The yak is big.", "这头牦牛很大。", "重点句型", "sentence"),
+      buildReviewItem("We see a yacht.", "我们看到一艘游艇。", "重点句型", "sentence"),
+      buildReviewItem("letter Zz", "字母 Zz", "字母操 · 大写 Z，小写 z", "letter"),
+      buildReviewItem("zero", "数字 0"),
+      buildReviewItem("zoo", "动物园"),
+      buildReviewItem("zebra", "斑马"),
+      buildReviewItem("zipper", "拉链"),
+      buildReviewItem("Zero is a number.", "零是一个数字。", "重点句型", "sentence"),
+      buildReviewItem("I go to the zoo.", "我去动物园。", "重点句型", "sentence"),
+      buildReviewItem("I see a zebra.", "我看到一只斑马。", "重点句型", "sentence"),
+      buildReviewItem("I pull my zipper.", "我拉我的拉链。", "重点句型", "sentence")
     ]
   },
   {
@@ -79,6 +296,7 @@ export const seedReviewLessons: ReviewLesson[] = [
     summary: "字母 Yy、相关单词和课堂重点句型。",
     teacherText:
       "letter Yy / yogurt 酸奶酪 / yawn 打哈欠 / yak 牦牛 / yacht 游艇 / I like yogurt. / I am tired. I yawn. / The yak is big. / We see a yacht.",
+    dailyContent: seedDailyContent["lesson-letter-y"],
     items: [
       buildReviewItem("letter Yy", "字母 Yy", "大写 Y，小写 y · 字母发音", "letter"),
       buildReviewItem("yogurt", "酸奶酪"),
@@ -99,6 +317,7 @@ export const seedReviewLessons: ReviewLesson[] = [
     summary: "字母 Zz、相关单词和课堂重点句型。",
     teacherText:
       "letter Zz / zero 数字0 / zoo 动物园 / zebra 斑马 / zipper 拉链 / Z is for zero. / Z is for zebra. / Zero is a number. / I go to the zoo. / I see a zebra. / I pull my zipper.",
+    dailyContent: seedDailyContent["lesson-letter-z"],
     items: [
       buildReviewItem("letter Zz", "字母 Zz", "字母操 · 大写 Z，小写 z", "letter"),
       buildReviewItem("zero", "数字 0"),
@@ -122,6 +341,7 @@ export const seedReviewLessons: ReviewLesson[] = [
       "教学目标：学习《Students Book》Unit 6 Fruit 主题词汇与句型。\n家作：跟读音频。\n课堂小结：同学们今天表现超棒哒！因为周日上冰沙活动课，我们前置教学水果词汇。回家也要多多复习呦！",
     teacherText:
       "apple 苹果 / pear 梨 / orange 橘子 / watermelon 西瓜 / pineapple 菠萝 / mango 芒果 / What fruit do you like? / I like...",
+    dailyContent: seedDailyContent["lesson-unit-6-fruits"],
     items: [
       buildReviewItem("apple", "苹果"),
       buildReviewItem("pear", "梨"),
@@ -137,30 +357,32 @@ export const seedReviewLessons: ReviewLesson[] = [
     id: "lesson-smoothie-diy",
     title: "水果冰沙 DIY",
     dateLabel: "LG1 课堂",
-    theme: "Fruits Smoothie",
-    summary: "水果、制作材料和冰沙课堂问答。",
+    theme: "Fruits Smoothie DIY",
+    summary: "水果、冰沙制作材料与喜好、材料问答句型。",
     teacherText:
-      "dragon fruit 火龙果 / kiwifruit 奇异果 / ice cube 冰块 / sugar 糖 / syrup 糖浆 / blender 搅拌机 / cup 杯子 / straw 吸管 / I like mango. / What do we need to make smoothie? / We need ice cubes. / We need a blender.",
+      "apple 苹果 / dragon fruit 火龙果 / mango 芒果 / kiwifruit 奇异果 / pineapple smoothie 菠萝冰沙 / ice cube 冰块 / sugar 糖 / syrup 糖浆 / blender 搅拌机 / cup 杯子 / straw 吸管 / What fruit do you like? / I like ... / What do we need to make smoothie? / We need ...",
+    dailyContent: seedDailyContent["lesson-smoothie-diy"],
     items: [
+      buildReviewItem("apple", "苹果"),
       buildReviewItem("dragon fruit", "火龙果"),
+      buildReviewItem("mango", "芒果"),
       buildReviewItem("kiwifruit", "奇异果"),
-      buildReviewItem("pineapple smoothie", "菠萝冰沙"),
+      buildReviewItem("pineapple smoothie", "菠萝冰沙", "课堂实操"),
       buildReviewItem("ice cube", "冰块"),
       buildReviewItem("sugar", "糖"),
       buildReviewItem("syrup", "糖浆"),
       buildReviewItem("blender", "搅拌机"),
       buildReviewItem("cup", "杯子"),
       buildReviewItem("straw", "吸管"),
-      buildReviewItem("I like mango.", "我喜欢芒果。", "", "sentence"),
+      buildReviewItem("What fruit do you like?", "你喜欢什么水果？", "询问喜好", "sentence"),
+      buildReviewItem("I like ...", "我喜欢……", "回答喜好", "sentence"),
       buildReviewItem(
         "What do we need to make smoothie?",
         "做冰沙我们需要什么？",
-        "",
+        "询问制作材料",
         "sentence"
       ),
-      buildReviewItem("We need ice cubes.", "我们需要冰块。", "", "sentence"),
-      buildReviewItem("We need a blender.", "我们需要一台搅拌机。", "", "sentence"),
-      buildReviewItem("It is yummy.", "它很好吃。", "品尝分享", "sentence")
+      buildReviewItem("We need ...", "我们需要……", "回答制作材料", "sentence")
     ]
   }
 ];
