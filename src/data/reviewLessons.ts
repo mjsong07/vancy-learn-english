@@ -13,21 +13,31 @@ export function createReviewId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+export function sanitizeReviewText(value: string) {
+  return Array.from(value)
+    .filter((character) => {
+      if (character.length > 1) return true;
+      const codePoint = character.charCodeAt(0);
+      return codePoint < 0xd800 || codePoint > 0xdfff;
+    })
+    .join("");
+}
+
 export function buildReviewItem(
   english: string,
   chinese = "",
   note = "",
   category?: ReviewItemCategory
 ): ReviewItem {
-  const normalizedEnglish = english.trim().replace(/\s+/g, " ");
-  const normalizedChinese = chinese.trim();
+  const normalizedEnglish = sanitizeReviewText(english).trim().replace(/\s+/g, " ");
+  const normalizedChinese = sanitizeReviewText(chinese).trim();
   return {
     id: createReviewId("item"),
     english: normalizedEnglish,
     chinese: normalizedChinese,
     category: category || inferCategory(normalizedEnglish),
     emoji: pickEmoji(normalizedEnglish, normalizedChinese),
-    note: note.trim()
+    note: sanitizeReviewText(note).trim()
   };
 }
 
@@ -453,9 +463,9 @@ function parseSinglePair(line: string): ReviewItem[] {
 
 function cleanLine(line: string) {
   return line
-    .replace(/[📆👩‍🏫🌞💬👇🧑‍🏫📖✍️🍍🦓]/g, "")
+    .replace(/[📆👩‍🏫🌞💬👇🧑‍🏫📖✍️🍍🦓]/gu, "")
     .replace(/^[\s—\-＿_【\]】]+|[\s—\-＿_【\]】]+$/g, "")
-    .replace(/^[0-9①②③④⑤⑥⑦⑧⑨1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣.、)\s-]+/g, "")
+    .replace(/^[0-9①②③④⑤⑥⑦⑧⑨1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣.、)\s-]+/gu, "")
     .replace(/\s+/g, " ")
     .trim();
 }

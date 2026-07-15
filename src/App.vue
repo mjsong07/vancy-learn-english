@@ -14,7 +14,11 @@ import {
   SwitchButton
 } from "@element-plus/icons-vue";
 import { useReviewLessons } from "./composables/useReviewLessons";
-import { getSeedDailyContent, reviewContentVersion } from "./data/reviewLessons";
+import {
+  getSeedDailyContent,
+  reviewContentVersion,
+  sanitizeReviewText
+} from "./data/reviewLessons";
 import { getReviewPhonetic } from "./data/reviewPhonetics";
 import {
   clearStoredReviewEditCode,
@@ -456,7 +460,11 @@ function buildReviewSyncPayload(): ReviewSyncPayload {
 }
 
 function cloneReviewLessons(sourceLessons: ReviewLesson[]) {
-  return JSON.parse(JSON.stringify(sourceLessons)) as ReviewLesson[];
+  return JSON.parse(
+    JSON.stringify(sourceLessons, (_key, value) =>
+      typeof value === "string" ? sanitizeReviewText(value) : value
+    )
+  ) as ReviewLesson[];
 }
 
 function applyRemoteReviewState(remoteState: RemoteReviewState) {

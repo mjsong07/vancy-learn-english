@@ -10,6 +10,7 @@ import {
   reviewContentVersionStorageKey,
   reviewProgressStorageKey,
   reviewStorageKey,
+  sanitizeReviewText,
   seedReviewLessons
 } from "../data/reviewLessons";
 import type { ReviewItem, ReviewLesson } from "../types/review";
@@ -66,7 +67,14 @@ function normalizeLessons(rawLessons: ReviewLesson[]) {
 
 function normalizeLessonItems(items: ReviewItem[] | undefined, fallbackItems: ReviewItem[]) {
   const sourceItems = Array.isArray(items) && items.length ? items : fallbackItems;
-  const dedupedItems = dedupeReviewItems(sourceItems);
+  const sanitizedItems = sourceItems.map((item) => ({
+    ...item,
+    english: sanitizeReviewText(item.english || ""),
+    chinese: sanitizeReviewText(item.chinese || ""),
+    emoji: sanitizeReviewText(item.emoji || ""),
+    note: sanitizeReviewText(item.note || "")
+  }));
+  const dedupedItems = dedupeReviewItems(sanitizedItems);
   return dedupedItems.length ? dedupedItems : fallbackItems;
 }
 
