@@ -8,10 +8,23 @@ function disablePageZoom() {
   const preventDefault = (event: Event) => {
     event.preventDefault();
   };
+  const preventMultiTouch = (event: TouchEvent) => {
+    if (event.touches.length > 1) {
+      event.preventDefault();
+    }
+  };
+
+  const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+  viewport?.setAttribute(
+    "content",
+    "width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  );
 
   document.addEventListener("gesturestart", preventDefault, { passive: false });
   document.addEventListener("gesturechange", preventDefault, { passive: false });
   document.addEventListener("gestureend", preventDefault, { passive: false });
+  document.addEventListener("touchstart", preventMultiTouch, { passive: false });
+  document.addEventListener("touchmove", preventMultiTouch, { passive: false });
 
   window.addEventListener(
     "wheel",

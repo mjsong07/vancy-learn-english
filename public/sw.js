@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "vancy-learn-english";
-const CACHE_VERSION = "2026-07-14";
+const CACHE_VERSION = "2026-07-15";
 const SHELL_CACHE = `${CACHE_PREFIX}-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `${CACHE_PREFIX}-runtime-${CACHE_VERSION}`;
 const APP_SCOPE = new URL(self.registration.scope);
@@ -41,6 +41,10 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const requestUrl = new URL(request.url);
+  if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith("/api/")) {
+    return;
+  }
+
   if (!isAppRequest(requestUrl) || requestUrl.pathname.endsWith("/sw.js")) return;
 
   if (request.mode === "navigate" || request.headers.get("accept")?.includes("text/html")) {

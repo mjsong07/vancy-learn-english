@@ -41,9 +41,16 @@ function normalizeLessons(rawLessons: ReviewLesson[]) {
         theme: lesson.theme || "English Review",
         summary: lesson.summary || "",
         teacherText: lesson.teacherText || "",
-        dailyContent:
-          seedLesson?.dailyContent ||
+        generatedContent:
+          lesson.generatedContent?.trim() ||
+          seedLesson?.generatedContent?.trim() ||
+          lesson.teacherText?.trim() ||
+          seedLesson?.teacherText?.trim() ||
           lesson.dailyContent?.trim() ||
+          "",
+        dailyContent:
+          lesson.dailyContent?.trim() ||
+          seedLesson?.dailyContent?.trim() ||
           lesson.teacherText ||
           lesson.summary ||
           "暂无今日学习内容。",
@@ -61,7 +68,10 @@ function normalizeLessonItems(items: ReviewItem[] | undefined, fallbackItems: Re
 const seedLessonMigrations = [
   { version: 3, lessonId: "lesson-unit-6-fruits", replaceExisting: true },
   { version: 10, lessonId: "lesson-letter-x", replaceExisting: true },
-  { version: 11, lessonId: "lesson-smoothie-diy", replaceExisting: true }
+  { version: 11, lessonId: "lesson-smoothie-diy", replaceExisting: true },
+  { version: 12, lessonId: "lesson-letter-x", replaceExisting: true },
+  { version: 12, lessonId: "lesson-letter-y", replaceExisting: true },
+  { version: 12, lessonId: "lesson-letter-z", replaceExisting: true }
 ] as const;
 
 const legacyGroupedLetterLessonIds = new Set(["lesson-letter-xyz-review", "lesson-letter-z"]);
@@ -220,27 +230,60 @@ export function useReviewLessons() {
     setActiveIndex(activeIndex.value - 1);
   }
 
-  function addLesson(payload: {
-    title: string;
-    dateLabel: string;
-    theme: string;
-    summary: string;
-    teacherText: string;
-  }) {
-    const parsedItems = parseReviewText(payload.teacherText);
+  function addLesson(payload: { generatedContent: string; teacherText: string }) {
+    const generatedContent = payload.generatedContent.trim();
+    const teacherText = payload.teacherText.trim();
+    const parsedItems = parseReviewText(generatedContent);
+    if (!parsedItems.length) return null;
+
+    const now = new Date();
+    const dateLabel = `${now.getMonth() + 1}月${now.getDate()}日`;
+    const wordCount = parsedItems.filter((item) => item.category === "word").length;
+    const sentenceCount = parsedItems.filter((item) => item.category === "sentence").length;
     const lesson: ReviewLesson = {
       id: createReviewId("lesson"),
-      title: payload.title.trim() || "新的复习日",
-      dateLabel: payload.dateLabel.trim() || "复习日",
-      theme: payload.theme.trim() || "English Review",
-      summary: payload.summary.trim() || "课后复习内容",
-      teacherText: payload.teacherText.trim(),
-      dailyContent: payload.teacherText.trim() || payload.summary.trim() || "暂无今日学习内容。",
-      items: parsedItems.length ? parsedItems : [buildReviewItem("hello", "你好")]
+      title: `${dateLabel}复习`,
+      dateLabel,
+      theme: "单词与句子",
+      summary: `已提取 ${wordCount} 个单词和 ${sentenceCount} 个句子。`,
+      teacherText,
+      generatedContent,
+      dailyContent: generatedContent,
+      items: parsedItems
     };
     lessons.value = [lesson, ...lessons.value];
     activeLessonId.value = lesson.id;
     progressMap.value = { ...progressMap.value, [lesson.id]: 0 };
+    return lesson;
+  }
+
+  function updateLesson(
+    lessonId: string,
+    payload: { generatedContent: string; teacherText: string }
+  ) {
+    const generatedContent = payload.generatedContent.trim();
+    const teacherText = payload.teacherText.trim();
+    const parsedItems = parseReviewText(generatedContent);
+    if (!parsedItems.length) return null;
+
+    const wordCount = parsedItems.filter((item) => item.category === "word").length;
+    const sentenceCount = parsedItems.filter((item) => item.category === "sentence").length;
+    const currentLesson = lessons.value.find((lesson) => lesson.id === lessonId);
+    if (!currentLesson) return null;
+
+    const updatedLesson: ReviewLesson = {
+      ...currentLesson,
+      summary: `已提取 ${wordCount} 个单词和 ${sentenceCount} 个句子。`,
+      teacherText,
+      generatedContent,
+      dailyContent: generatedContent,
+      items: parsedItems
+    };
+    lessons.value = lessons.value.map((lesson) =>
+      lesson.id === lessonId ? updatedLesson : lesson
+    );
+    progressMap.value = { ...progressMap.value, [lessonId]: 0 };
+    return updatedLesson;
   }
 
   function addItemToActiveLesson(english: string, chinese: string) {
@@ -287,6 +330,27 @@ export function useReviewLessons() {
     progressMap.value = {};
   }
 
+  function replaceLessons(nextLessons: ReviewLesson[]) {
+    const normalizedLessons = normalizeLessons(nextLessons);
+    lessons.value = normalizedLessons;
+
+    if (!normalizedLessons.some((lesson) => lesson.id === activeLessonId.value)) {
+      activeLessonId.value = normalizedLessons[0]?.id || "";
+    }
+
+    const lessonIds = new Set(normalizedLessons.map((lesson) => lesson.id));
+    progressMap.value = Object.entries(progressMap.value).reduce<Record<string, number>>(
+      (nextProgress, [lessonId, itemIndex]) => {
+        const lesson = normalizedLessons.find((candidate) => candidate.id === lessonId);
+        if (!lessonIds.has(lessonId) || !lesson?.items.length) return nextProgress;
+        nextProgress[lessonId] = Math.min(itemIndex, lesson.items.length - 1);
+        return nextProgress;
+      },
+      {}
+    );
+    localStorage.setItem(reviewContentVersionStorageKey, String(reviewContentVersion));
+  }
+
   function updateLessonItems(lessonId: string, items: ReviewItem[]) {
     const nextItems = dedupeReviewItems(items);
     lessons.value = lessons.value.map((lesson) =>
@@ -312,9 +376,11 @@ export function useReviewLessons() {
     nextItem,
     previousItem,
     addLesson,
+    updateLesson,
     addItemToActiveLesson,
     removeItem,
     deleteLesson,
-    restoreSeedLessons
+    restoreSeedLessons,
+    replaceLessons
   };
 }

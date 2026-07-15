@@ -19,7 +19,7 @@ const reviewPhonetics: Record<string, string> = {
   mango: "ˈmæŋɡoʊ",
   "dragon fruit": "ˈdræɡən fruːt",
   kiwifruit: "ˈkiːwiːfruːt",
-  "pineapple smoothie": "ˈpaɪnˌæpəl ˈsmuːði",
+  "smoothie": "ˈsmuːði",
   "ice cube": "ˈaɪs kjuːb",
   sugar: "ˈʃʊɡər",
   syrup: "ˈsɪrəp",

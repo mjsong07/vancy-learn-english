@@ -18,6 +18,7 @@
 - 参考图：`codex-clipboard-7aaabbcb-d27f-420c-830d-612c9aec2a4f.png`（短标题页面高度）
 - 参考图：`codex-clipboard-8d149506-5aeb-4eb0-948f-af1be1355c13.png`（长标题页面高度）
 - 参考图：`codex-clipboard-2cc1728b-4436-47df-94a6-86424e6de9cf.png`（单词音标位置）
+- 参考图：`codex-clipboard-c7c5d960-4c44-48b5-b343-123feea02d56.png`（课程卡片学习内容入口）
 - 实现截图：`/tmp/vancy-sentence-layout-final.jpg`
 - 实现截图：`/tmp/vancy-settings-list-final.jpg`
 - 实现截图：`/tmp/vancy-summary-layout-final.jpg`
@@ -25,6 +26,8 @@
 - 实现截图：`/tmp/vancy-fixed-height-kiwi.png`
 - 实现截图：`/tmp/vancy-fixed-height-pineapple.png`
 - 实现截图：`/tmp/vancy-phonetic-blender-final.png`
+- 实现截图：`/tmp/vancy-daily-content-button-final-390.png`
+- 实现截图：`/tmp/vancy-daily-content-z-final-390.png`
 - 验证视口：390 x 844 手机视口
 
 ## 对照结果
@@ -45,6 +48,7 @@
 - 长问题单行对照：`/tmp/vancy-question-nowrap-comparison.jpg`
 - 固定高度页面对照：`/tmp/vancy-fixed-height-comparison.png`
 - 单词音标位置对照：`/tmp/vancy-phonetic-comparison.png`
+- 今日学习内容对照：`/tmp/vancy-daily-content-comparison.png`
 - 拼写设置截图：`/tmp/vancy-spelling-setting-final.jpg`
 - 设置入口位于内容导航之后、下一步按钮之前，顺序和间距稳定。
 - 设置抽屉采用底部弹出结构，包含标题、关闭按钮、三段切换和当前内容列表。
@@ -65,6 +69,10 @@
 - 学习问题固定单行显示，按文本长度自动缩放字号，避免长问题换行撑高页面。
 - 标题、翻译、拼写、图片、步骤按钮和图标导航均使用固定高度轨道，切换内容时下方模块不再偏移。
 - 单词页在中文翻译左侧显示 IPA 音标，字母和句子页保持原有翻译布局。
+- 课程卡片右侧星标已替换为“今日学习内容”按钮，位置与课程标题保持同一行。
+- 点击按钮后从底部打开原始群发内容，保留老师文本的换行、表情和段落层级。
+- Letter Zz 使用老师提供的原始信息；拆分后的 Letter Xx、Letter Yy 分别配置匹配的单词、重点句型、作业与课堂小结。
+- Unit 6 水果和水果冰沙课程也各自保存对应的学习内容，课程切换后按钮展示当前课程文本。
 
 ## 交互验证
 
@@ -85,6 +93,11 @@
 - 拼写开启时，单词页和句子页均保留 54px 拼写轨道；实测学习卡高度均为 490px，图片与内容面板位置一致。
 - `blender` 实测显示 `/ˈblendər/`，音标无截断；翻译轨道保持 44px，切换到句子后图片坐标不变。
 - 当前内置课程的单词均有音标映射，句子与字母内容未渲染音标。
+- 390 x 844 视口下，“今日学习内容”按钮实测为 115.36 x 42px，文字完整且未挤压课程标题。
+- 长内容弹层宽度为 390px，正文使用 `pre-wrap` 和 `overflow-wrap: anywhere`；内容区独立纵向滚动，页面宽度保持 390px。
+- Letter Xx 实测包含 X-ray、six、box、ox 及四条对应句型；Letter Yy 实测包含 yogurt、yawn、yak、yacht 及四条对应句型。
+- Letter Zz 弹层逐段核对老师原文，标题、相关单词、重点句型、家庭作业和课堂小结完整显示。
+- 内置数据版本升级至 v9，旧版合并课程会迁移为 X、Y、Z 分拆课程，同时保留用户自建复习日。
 - 页面自身无控制台错误；Chrome 翻译扩展出现的网络超时与项目无关。
 - Chrome 控制台仅有 Vite 连接调试信息，无错误或警告。
 - `pnpm build` 通过；仅保留原有的第三方 PURE 注释和大分包提示。
@@ -118,5 +131,6 @@
 18. 将问题标题改为单行显示，并按内容长度在 12px 至 43px 之间自动缩放。
 19. 固定学习卡全部内容轨道高度，并为无拼写内容保留等高占位，消除逐项切换偏移。
 20. 在单词翻译左侧增加 IPA 音标，并保持固定高度与非单词页面布局稳定。
+21. 将课程星标替换为“今日学习内容”按钮，新增老师原文弹层，并为拆分课程补齐匹配的教学内容。
 
 final result: passed

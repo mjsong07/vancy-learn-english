@@ -4,7 +4,7 @@ export const reviewStorageKey = "kid-english-review-lessons-v1";
 export const reviewProgressStorageKey = "kid-english-review-progress-v1";
 export const reviewActiveLessonStorageKey = "kid-english-review-active-lesson-v1";
 export const reviewContentVersionStorageKey = "kid-english-review-content-version-v1";
-export const reviewContentVersion = 11;
+export const reviewContentVersion = 13;
 
 export function createReviewId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -43,11 +43,17 @@ export function getReviewItemDedupeKey(english: string) {
 export function dedupeReviewItems(items: ReviewItem[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
+    if (isLetterTitleReviewItem(item)) return false;
+
     const key = getReviewItemDedupeKey(item.english);
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+export function isLetterTitleReviewItem(item: Pick<ReviewItem, "english" | "category">) {
+  return item.category === "letter" && /^letter\s+[a-z]{1,2}$/i.test(item.english.trim());
 }
 
 const seedDailyContent: Record<string, string> = {
@@ -259,7 +265,6 @@ export const seedReviewLessons: ReviewLesson[] = [
     dailyContent: seedDailyContent["lesson-letter-x"],
     items: [
       buildReviewItem("A is for Apple", "字母歌曲 A-Z", "歌曲复习", "letter"),
-      buildReviewItem("letter Xx", "字母 Xx", "大写 X，小写 x · 字母发音", "letter"),
       buildReviewItem("X-ray", "X 光片"),
       buildReviewItem("six", "六"),
       buildReviewItem("box", "盒子，箱子"),
@@ -268,7 +273,6 @@ export const seedReviewLessons: ReviewLesson[] = [
       buildReviewItem("I have six toys.", "我有六个玩具。", "重点句型", "sentence"),
       buildReviewItem("This is my box.", "这是我的盒子。", "重点句型", "sentence"),
       buildReviewItem("The ox is big.", "这头公牛很大。", "重点句型", "sentence"),
-      buildReviewItem("letter Yy", "字母 Yy", "大写 Y，小写 y · 字母发音", "letter"),
       buildReviewItem("yogurt", "酸奶酪"),
       buildReviewItem("yawn", "打哈欠"),
       buildReviewItem("yak", "牦牛"),
@@ -277,7 +281,6 @@ export const seedReviewLessons: ReviewLesson[] = [
       buildReviewItem("I am tired. I yawn.", "我累了，我打哈欠。", "重点句型", "sentence"),
       buildReviewItem("The yak is big.", "这头牦牛很大。", "重点句型", "sentence"),
       buildReviewItem("We see a yacht.", "我们看到一艘游艇。", "重点句型", "sentence"),
-      buildReviewItem("letter Zz", "字母 Zz", "字母操 · 大写 Z，小写 z", "letter"),
       buildReviewItem("zero", "数字 0"),
       buildReviewItem("zoo", "动物园"),
       buildReviewItem("zebra", "斑马"),
@@ -298,7 +301,6 @@ export const seedReviewLessons: ReviewLesson[] = [
       "letter Yy / yogurt 酸奶酪 / yawn 打哈欠 / yak 牦牛 / yacht 游艇 / I like yogurt. / I am tired. I yawn. / The yak is big. / We see a yacht.",
     dailyContent: seedDailyContent["lesson-letter-y"],
     items: [
-      buildReviewItem("letter Yy", "字母 Yy", "大写 Y，小写 y · 字母发音", "letter"),
       buildReviewItem("yogurt", "酸奶酪"),
       buildReviewItem("yawn", "打哈欠"),
       buildReviewItem("yak", "牦牛"),
@@ -319,7 +321,6 @@ export const seedReviewLessons: ReviewLesson[] = [
       "letter Zz / zero 数字0 / zoo 动物园 / zebra 斑马 / zipper 拉链 / Z is for zero. / Z is for zebra. / Zero is a number. / I go to the zoo. / I see a zebra. / I pull my zipper.",
     dailyContent: seedDailyContent["lesson-letter-z"],
     items: [
-      buildReviewItem("letter Zz", "字母 Zz", "字母操 · 大写 Z，小写 z", "letter"),
       buildReviewItem("zero", "数字 0"),
       buildReviewItem("zoo", "动物园"),
       buildReviewItem("zebra", "斑马"),
@@ -360,14 +361,15 @@ export const seedReviewLessons: ReviewLesson[] = [
     theme: "Fruits Smoothie DIY",
     summary: "水果、冰沙制作材料与喜好、材料问答句型。",
     teacherText:
-      "apple 苹果 / dragon fruit 火龙果 / mango 芒果 / kiwifruit 奇异果 / pineapple smoothie 菠萝冰沙 / ice cube 冰块 / sugar 糖 / syrup 糖浆 / blender 搅拌机 / cup 杯子 / straw 吸管 / What fruit do you like? / I like ... / What do we need to make smoothie? / We need ...",
+      "apple 苹果 / dragon fruit 火龙果 / mango 芒果 / kiwifruit 奇异果 / pineapple 菠萝 / smoothie 冰沙 / ice cube 冰块 / sugar 糖 / syrup 糖浆 / blender 搅拌机 / cup 杯子 / straw 吸管 / What fruit do you like? / I like ... / What do we need to make smoothie? / We need ...",
     dailyContent: seedDailyContent["lesson-smoothie-diy"],
     items: [
       buildReviewItem("apple", "苹果"),
       buildReviewItem("dragon fruit", "火龙果"),
       buildReviewItem("mango", "芒果"),
       buildReviewItem("kiwifruit", "奇异果"),
-      buildReviewItem("pineapple smoothie", "菠萝冰沙", "课堂实操"),
+      buildReviewItem("pineapple", "菠萝"),
+      buildReviewItem("smoothie", "冰沙"),
       buildReviewItem("ice cube", "冰块"),
       buildReviewItem("sugar", "糖"),
       buildReviewItem("syrup", "糖浆"),
@@ -394,7 +396,11 @@ export function parseReviewText(rawText: string) {
     .flatMap((line) => parseReviewLine(line))
     .filter((item) => item.english);
 
-  return dedupeReviewItems(parsed);
+  return dedupeReviewItems(parsed).filter(
+    (item) =>
+      Boolean(item.chinese.trim()) &&
+      (item.category === "word" || item.category === "sentence")
+  );
 }
 
 function parseReviewLine(line: string): ReviewItem[] {

@@ -27,6 +27,7 @@ body,
 #app {
   min-height: 100%;
   width: 100%;
+  touch-action: pan-x pan-y;
 }
 
 body {
@@ -449,14 +450,23 @@ textarea {
   font-size: 1rem;
 }
 
-.picture-frame {
-  display: grid;
+.picture-tools {
+  position: relative;
+  display: block;
   flex: 0 0 210px;
-  place-items: center;
   width: 100%;
   height: 210px;
   min-height: 210px;
   margin-top: 18px;
+}
+
+.picture-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 210px;
+  min-height: 0;
   overflow: hidden;
   padding: 10px;
   border: 6px solid #ffffff;
@@ -467,9 +477,57 @@ textarea {
   box-shadow: 0 18px 42px rgba(57, 87, 123, 0.14);
 }
 
+.picture-frame.has-reference-image {
+  padding: 0;
+  background: #ffffff;
+}
+
 .picture-emoji {
   font-size: 10rem;
   line-height: 0.95;
+}
+
+.reference-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.picture-loading {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: fit-content;
+  overflow: hidden;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(32, 39, 53, 0.78);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-refresh-button.el-button.is-circle {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  background: var(--blue-soft);
+  color: var(--primary);
+  box-shadow: 0 10px 24px rgba(57, 87, 123, 0.16);
+}
+
+.reference-refresh-button.el-button.is-circle:hover {
+  border-color: rgba(47, 102, 239, 0.36);
+  background: #ffffff;
 }
 
 .mini-card-strip {
@@ -1021,6 +1079,121 @@ textarea {
   flex: 0 0 auto;
 }
 
+.settings-sync-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.settings-sync-card.status-offline,
+.settings-sync-card.status-error,
+.settings-sync-card.status-conflict {
+  border-color: rgba(255, 111, 97, 0.32);
+  background: #fff8f6;
+}
+
+.settings-sync-title,
+.settings-sync-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.settings-sync-title strong {
+  font-size: 0.94rem;
+}
+
+.settings-sync-title small {
+  flex: 0 0 auto;
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 880;
+}
+
+.settings-sync-card.status-offline .settings-sync-title small,
+.settings-sync-card.status-error .settings-sync-title small,
+.settings-sync-card.status-conflict .settings-sync-title small {
+  color: var(--coral);
+}
+
+.settings-sync-row span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-sync-row .el-button {
+  flex: 0 0 auto;
+  margin-left: 0;
+  color: var(--primary);
+  font-weight: 900;
+}
+
+.settings-study-mode-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.settings-study-mode-title {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.settings-study-mode-title strong {
+  font-size: 0.94rem;
+}
+
+.settings-study-mode-title small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-study-mode-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-number-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-number-field span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.settings-number-field .el-input-number {
+  width: 100%;
+}
+
 .settings-lesson-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1029,7 +1202,7 @@ textarea {
 
 .settings-lesson-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   min-width: 0;
   min-height: 70px;
@@ -1098,6 +1271,21 @@ textarea {
   color: rgba(102, 115, 134, 0.72);
 }
 
+.settings-lesson-actions {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.settings-lesson-actions .el-button {
+  width: 28px;
+  margin-left: 0;
+}
+
+.settings-lesson-edit {
+  color: rgba(47, 102, 239, 0.78);
+}
+
 .settings-review-list {
   margin-top: 18px;
   padding-top: 16px;
@@ -1122,6 +1310,20 @@ textarea {
   min-height: 44px;
   border-radius: 8px;
   font-weight: 900;
+}
+
+.lesson-editor-dialog {
+  border-radius: 12px;
+}
+
+.lesson-editor-dialog .el-dialog__body {
+  max-height: min(68vh, 620px);
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+.lesson-editor-form .el-form-item {
+  margin-bottom: 14px;
 }
 
 .settings-restore-section {
