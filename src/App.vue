@@ -51,7 +51,7 @@ const {
   replaceLessons
 } = useReviewLessons();
 
-type SettingsSection = "lessons" | "add" | "restore";
+type SettingsSection = "lessons" | "add" | "learning";
 type ReferenceImageStatus = "idle" | "loading" | "error";
 type SyncStatus = "idle" | "loading" | "saving" | "offline" | "error" | "conflict";
 
@@ -92,7 +92,7 @@ const syncUpdatedAt = ref("");
 const settingsOptions: Array<{ label: string; value: SettingsSection }> = [
   { label: "复习内容", value: "lessons" },
   { label: "添加复习日", value: "add" },
-  { label: "恢复示例", value: "restore" }
+  { label: "学习设置", value: "learning" }
 ];
 const referenceImageStopWords = new Set([
   "a",
@@ -270,6 +270,7 @@ const lessonForm = reactive({
 const lessonEditorOpen = ref(false);
 const lessonEditorForm = reactive({
   lessonId: "",
+  title: "",
   generatedContent: "",
   teacherText: ""
 });
@@ -350,21 +351,17 @@ const syncStatusDetail = computed(() => {
   if (syncStatus.value === "offline") return "云端暂时不可用，本机数据仍可继续使用";
   if (syncStatus.value === "conflict") return "云端已有新版本，先同步后再保存";
   if (syncUpdatedAt.value) return `版本 ${syncRevision.value} · ${formatSyncTime(syncUpdatedAt.value)}`;
-  return "首次保存后会初始化 Cloudflare D1 数据";
+  return "首次保存后会初始化 Supabase 云端数据";
 });
 
 const activeDailyContent = computed(() => {
   const lesson = activeLesson.value;
   if (!lesson) return "暂无今日学习内容。";
-  const primaryContent =
-    lesson.generatedContent?.trim() ||
-    lesson.dailyContent?.trim() ||
+  return (
     lesson.teacherText?.trim() ||
     getSeedDailyContent(lesson.id) ||
-    lesson.summary;
-  const teacherText = getSeedDailyContent(lesson.id) || lesson.teacherText?.trim();
-  if (!teacherText || teacherText === primaryContent) return primaryContent;
-  return `【生成内容】\n${primaryContent}\n\n【老师发来的内容】\n${teacherText}`;
+    "暂无老师发来的内容。"
+  );
 });
 
 const currentLearningItems = computed(() => {
@@ -532,7 +529,7 @@ async function getReviewEditCode() {
 
   try {
     const result = await ElMessageBox.prompt(
-      "请输入 Cloudflare 中配置的家庭编辑码。",
+      "请输入 Supabase Edge Function 中配置的家庭编辑码。",
       "云端保存",
       {
         confirmButtonText: "保存",
@@ -843,12 +840,19 @@ function getLessonGeneratedContent(lesson: ReviewLesson) {
 function openLessonEditor(lesson: ReviewLesson) {
   selectLesson(lesson.id);
   lessonEditorForm.lessonId = lesson.id;
+  lessonEditorForm.title = lesson.title;
   lessonEditorForm.generatedContent = getLessonGeneratedContent(lesson);
   lessonEditorForm.teacherText = lesson.teacherText?.trim() || "";
   lessonEditorOpen.value = true;
 }
 
 async function handleUpdateLesson() {
+  const title = lessonEditorForm.title.trim();
+  if (!title) {
+    ElMessage.warning("请先填写标题");
+    return;
+  }
+
   const generatedContent = lessonEditorForm.generatedContent.trim();
   if (!generatedContent) {
     ElMessage.warning("请先填写生成内容");
@@ -856,6 +860,7 @@ async function handleUpdateLesson() {
   }
 
   const lesson = updateLesson(lessonEditorForm.lessonId, {
+    title,
     generatedContent,
     teacherText: lessonEditorForm.teacherText
   });
@@ -1133,62 +1138,6 @@ function resetLessonForm() {
               <p>切换后会继续上次的复习进度。</p>
             </div>
 
-            <div class="settings-display-toggle">
-              <strong>显示拼写</strong>
-              <el-switch v-model="showSpelling" aria-label="显示拼写" />
-            </div>
-
-            <section class="settings-sync-card" :class="`status-${syncStatus}`">
-              <div class="settings-sync-title">
-                <strong>云端同步</strong>
-                <small>{{ syncStatusLabel }}</small>
-              </div>
-              <div class="settings-sync-row">
-                <span>{{ syncStatusDetail }}</span>
-                <el-button
-                  :icon="RefreshLeft"
-                  text
-                  :loading="isSyncBusy"
-                  @click="loadRemoteReviewState()"
-                >
-                  同步云端
-                </el-button>
-              </div>
-            </section>
-
-            <section class="settings-study-mode-card" aria-label="学习模式设置">
-              <div class="settings-study-mode-title">
-                <strong>学习模式</strong>
-                <small>自动播放后跳到下一个</small>
-              </div>
-              <div class="settings-study-mode-controls">
-                <label class="settings-number-field">
-                  <span>重复次数</span>
-                  <el-input-number
-                    v-model="studyModeRepeatCount"
-                    :min="1"
-                    :max="10"
-                    :step="1"
-                    :precision="0"
-                    controls-position="right"
-                    aria-label="学习模式重复次数"
-                  />
-                </label>
-                <label class="settings-number-field">
-                  <span>间隔秒数</span>
-                  <el-input-number
-                    v-model="studyModeIntervalSeconds"
-                    :min="0.5"
-                    :max="10"
-                    :step="0.5"
-                    :precision="1"
-                    controls-position="right"
-                    aria-label="学习模式间隔秒数"
-                  />
-                </label>
-              </div>
-            </section>
-
             <nav class="settings-lesson-grid" aria-label="复习日列表">
               <div
                 v-for="lesson in lessons"
@@ -1199,7 +1148,7 @@ function resetLessonForm() {
                 <button
                   class="settings-lesson-main"
                   type="button"
-                  @click="openLessonEditor(lesson)"
+                  @click="selectLesson(lesson.id)"
                 >
                   <span class="settings-lesson-icon">
                     <el-icon><Calendar /></el-icon>
@@ -1304,15 +1253,78 @@ function resetLessonForm() {
             </el-form>
           </section>
 
-          <section v-else class="settings-section settings-restore-section">
-            <span class="settings-restore-icon">
-              <el-icon><RefreshLeft /></el-icon>
-            </span>
-            <h3>恢复内置复习内容</h3>
-            <p>将课程列表恢复为内置示例，当前添加的课程会被替换。</p>
-            <el-button type="danger" plain :icon="RefreshLeft" @click="handleRestoreSeeds">
-              恢复示例内容
-            </el-button>
+          <section v-else class="settings-section">
+            <div class="settings-section-intro">
+              <h3>学习设置</h3>
+              <p>调整复习显示、自动播放和云端同步。</p>
+            </div>
+
+            <div class="settings-display-toggle">
+              <strong>显示拼写</strong>
+              <el-switch v-model="showSpelling" aria-label="显示拼写" />
+            </div>
+
+            <section class="settings-sync-card" :class="`status-${syncStatus}`">
+              <div class="settings-sync-title">
+                <strong>云端同步</strong>
+                <small>{{ syncStatusLabel }}</small>
+              </div>
+              <div class="settings-sync-row">
+                <span>{{ syncStatusDetail }}</span>
+                <el-button
+                  :icon="RefreshLeft"
+                  text
+                  :loading="isSyncBusy"
+                  @click="loadRemoteReviewState()"
+                >
+                  同步云端
+                </el-button>
+              </div>
+            </section>
+
+            <section class="settings-study-mode-card" aria-label="学习模式设置">
+              <div class="settings-study-mode-title">
+                <strong>学习模式</strong>
+                <small>自动播放后跳到下一个</small>
+              </div>
+              <div class="settings-study-mode-controls">
+                <label class="settings-number-field">
+                  <span>重复次数</span>
+                  <el-input-number
+                    v-model="studyModeRepeatCount"
+                    :min="1"
+                    :max="10"
+                    :step="1"
+                    :precision="0"
+                    controls-position="right"
+                    aria-label="学习模式重复次数"
+                  />
+                </label>
+                <label class="settings-number-field">
+                  <span>间隔秒数</span>
+                  <el-input-number
+                    v-model="studyModeIntervalSeconds"
+                    :min="0.5"
+                    :max="10"
+                    :step="0.5"
+                    :precision="1"
+                    controls-position="right"
+                    aria-label="学习模式间隔秒数"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section class="settings-restore-section">
+              <span class="settings-restore-icon">
+                <el-icon><RefreshLeft /></el-icon>
+              </span>
+              <h3>恢复内置复习内容</h3>
+              <p>将课程列表恢复为内置示例，当前添加的课程会被替换。</p>
+              <el-button type="danger" plain :icon="RefreshLeft" @click="handleRestoreSeeds">
+                恢复示例内容
+              </el-button>
+            </section>
           </section>
         </div>
       </div>
@@ -1326,6 +1338,14 @@ function resetLessonForm() {
       append-to-body
     >
       <el-form label-position="top" class="lesson-form lesson-editor-form">
+        <el-form-item label="标题">
+          <el-input
+            v-model="lessonEditorForm.title"
+            maxlength="50"
+            show-word-limit
+            placeholder="请输入复习日标题"
+          />
+        </el-form-item>
         <el-form-item label="生成内容">
           <el-input
             v-model="lessonEditorForm.generatedContent"

@@ -11,7 +11,7 @@
 - 使用浏览器语音朗读英文
 - 自动记录每个复习日的学习进度
 - 数据保存在当前浏览器的 `localStorage`
-- 可通过 Cloudflare Pages Functions + D1 同步复习内容和参考图片
+- 通过 Supabase Edge Function + PostgreSQL 同步复习内容和参考图片状态
 - 内置 Letter Xx/Yy/Zz 字母单元和水果冰沙示例课
 
 ## 本地运行
@@ -25,25 +25,87 @@ pnpm dev
 
 ## 构建
 
+普通构建路径为 `/`：
+
 ```bash
 pnpm build
 ```
 
-默认构建路径为 `/`，适合 Cloudflare Pages。若要继续构建 GitHub Pages 子路径版本：
+GitHub Pages 使用仓库子路径构建：
 
 ```bash
 pnpm build:github
 ```
 
-## Cloudflare 同步部署
+## GitHub Pages + Supabase 部署
 
-1. 在 Cloudflare Pages 连接 GitHub 仓库 `mjsong07/vancy-learn-english`。
-2. Build command 填 `pnpm build`，Build output directory 填 `dist`。
-3. 创建 D1 database，例如 `vancy-learn-english-db`。
-4. 在 Pages 项目的 Settings > Bindings 添加 D1 database binding，变量名固定为 `DB`。
-5. 在 Variables and Secrets 添加 Secret，变量名固定为 `REVIEW_EDIT_CODE`，值为家庭编辑码。
-6. 在 D1 Console 执行 `migrations/0001_create_review_shared_state.sql`。
-7. 重新部署 Pages，让 binding 和 secret 生效。
+### 1. 创建 Supabase 数据表
+
+在 Supabase 创建免费项目，然后进入 SQL Editor，执行：
+
+```text
+supabase/migrations/20260715000000_create_review_shared_state.sql
+```
+
+数据表已启用 RLS，`anon` 和 `authenticated` 角色不能直接访问；读写统一通过使用 service role 的 Edge Function 完成。
+
+### 2. 部署 Edge Function
+
+先登录并关联 Supabase 项目：
+
+```bash
+npx supabase login
+npx supabase link --project-ref <项目 ID>
+```
+
+设置家庭编辑码。建议使用长度至少 16 位的随机值：
+
+```bash
+npx supabase secrets set REVIEW_EDIT_CODE=<家庭编辑码>
+```
+
+如果以后绑定了其他前端域名，可以增加允许跨域访问的来源，多个来源用英文逗号分隔：
+
+```bash
+npx supabase secrets set ALLOWED_ORIGINS=https://mjsong07.github.io
+```
+
+部署公开读取、编辑码保护写入的同步函数：
+
+```bash
+npx supabase functions deploy review-state --no-verify-jwt
+```
+
+同步接口地址格式如下：
+
+```text
+https://<项目 ID>.supabase.co/functions/v1/review-state
+```
+
+### 3. 配置 GitHub Pages
+
+进入 GitHub 仓库的 `Settings > Secrets and variables > Actions > Variables`，添加仓库变量：
+
+```text
+VITE_REVIEW_SYNC_URL=https://<项目 ID>.supabase.co/functions/v1/review-state
+```
+
+推送到 `main` 后，`.github/workflows/pages.yml` 会使用 `pnpm build:github` 构建并部署到：
+
+```text
+https://mjsong07.github.io/vancy-learn-english/
+```
+
+### 4. 本地连接 Supabase
+
+复制环境变量示例并填写同步接口：
+
+```bash
+cp .env.example .env.local
+pnpm dev
+```
+
+首次进入应用时点击“同步云端”，输入 Edge Function 中配置的家庭编辑码，即可使用当前浏览器数据初始化 Supabase。
 
 ## 主要目录
 
@@ -52,7 +114,12 @@ src/
 ├── App.vue
 ├── composables/useReviewLessons.ts
 ├── data/reviewLessons.ts
+├── services/reviewSync.ts
 ├── services/speech.ts
 ├── styles/main.css
 └── types/review.ts
+
+supabase/
+├── functions/review-state/index.ts
+└── migrations/20260715000000_create_review_shared_state.sql
 ```

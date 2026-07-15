@@ -38,7 +38,7 @@ interface SaveRemoteReviewStatePayload {
   payload: ReviewSyncPayload;
 }
 
-const reviewStateEndpoint = "/api/review-state";
+const reviewStateEndpoint = String(import.meta.env.VITE_REVIEW_SYNC_URL || "").trim();
 export const reviewEditCodeStorageKey = "vancy-review-edit-code-v1";
 
 export function getStoredReviewEditCode() {
@@ -62,6 +62,7 @@ export function clearStoredReviewEditCode() {
 }
 
 export async function fetchRemoteReviewState() {
+  assertReviewSyncConfigured();
   const response = await fetch(reviewStateEndpoint, {
     headers: { Accept: "application/json" },
     cache: "no-store"
@@ -77,6 +78,7 @@ export async function fetchRemoteReviewState() {
 }
 
 export async function saveRemoteReviewState(payload: SaveRemoteReviewStatePayload) {
+  assertReviewSyncConfigured();
   const response = await fetch(reviewStateEndpoint, {
     method: "POST",
     headers: {
@@ -110,6 +112,12 @@ export async function saveRemoteReviewState(payload: SaveRemoteReviewStatePayloa
 
 export function isReviewSyncError(error: unknown): error is ReviewSyncError {
   return error instanceof ReviewSyncError;
+}
+
+function assertReviewSyncConfigured() {
+  if (!reviewStateEndpoint) {
+    throw new ReviewSyncError("unavailable", "尚未配置 Supabase 同步服务");
+  }
 }
 
 async function readRemoteReviewState(response: Response) {

@@ -35,25 +35,30 @@ function normalizeLessons(rawLessons: ReviewLesson[]) {
     .filter((lesson) => lesson?.id && lesson?.title)
     .map((lesson) => {
       const seedLesson = fallback.find((candidate) => candidate.id === lesson.id);
+      const generatedContent =
+        lesson.generatedContent?.trim() ||
+        seedLesson?.generatedContent?.trim() ||
+        lesson.teacherText?.trim() ||
+        seedLesson?.teacherText?.trim() ||
+        lesson.dailyContent?.trim() ||
+        "";
+      const storedTeacherText = lesson.teacherText?.trim() || "";
+      const storedDailyContent = lesson.dailyContent?.trim() || "";
+      const teacherText =
+        storedDailyContent &&
+        storedDailyContent !== generatedContent &&
+        (!storedTeacherText || storedTeacherText === generatedContent)
+          ? storedDailyContent
+          : storedTeacherText;
+
       return {
         ...lesson,
         dateLabel: lesson.dateLabel || "复习日",
         theme: lesson.theme || "English Review",
         summary: lesson.summary || "",
-        teacherText: lesson.teacherText || "",
-        generatedContent:
-          lesson.generatedContent?.trim() ||
-          seedLesson?.generatedContent?.trim() ||
-          lesson.teacherText?.trim() ||
-          seedLesson?.teacherText?.trim() ||
-          lesson.dailyContent?.trim() ||
-          "",
-        dailyContent:
-          lesson.dailyContent?.trim() ||
-          seedLesson?.dailyContent?.trim() ||
-          lesson.teacherText ||
-          lesson.summary ||
-          "暂无今日学习内容。",
+        teacherText,
+        generatedContent,
+        dailyContent: teacherText || generatedContent || lesson.summary || "暂无今日学习内容。",
         items: normalizeLessonItems(lesson.items, fallback[0].items)
       };
     });
@@ -248,7 +253,7 @@ export function useReviewLessons() {
       summary: `已提取 ${wordCount} 个单词和 ${sentenceCount} 个句子。`,
       teacherText,
       generatedContent,
-      dailyContent: generatedContent,
+      dailyContent: teacherText || generatedContent,
       items: parsedItems
     };
     lessons.value = [lesson, ...lessons.value];
@@ -259,8 +264,9 @@ export function useReviewLessons() {
 
   function updateLesson(
     lessonId: string,
-    payload: { generatedContent: string; teacherText: string }
+    payload: { title: string; generatedContent: string; teacherText: string }
   ) {
+    const title = payload.title.trim();
     const generatedContent = payload.generatedContent.trim();
     const teacherText = payload.teacherText.trim();
     const parsedItems = parseReviewText(generatedContent);
@@ -273,10 +279,11 @@ export function useReviewLessons() {
 
     const updatedLesson: ReviewLesson = {
       ...currentLesson,
+      title,
       summary: `已提取 ${wordCount} 个单词和 ${sentenceCount} 个句子。`,
       teacherText,
       generatedContent,
-      dailyContent: generatedContent,
+      dailyContent: teacherText || generatedContent,
       items: parsedItems
     };
     lessons.value = lessons.value.map((lesson) =>

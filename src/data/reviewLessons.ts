@@ -394,13 +394,14 @@ export function parseReviewText(rawText: string) {
     .split(/\n|；|;/)
     .flatMap((line) => line.split(/\s+\/\s+/))
     .flatMap((line) => parseReviewLine(line))
-    .filter((item) => item.english);
+    .filter(
+      (item) =>
+        Boolean(item.english) &&
+        Boolean(item.chinese.trim()) &&
+        (item.category === "word" || item.category === "sentence")
+    );
 
-  return dedupeReviewItems(parsed).filter(
-    (item) =>
-      Boolean(item.chinese.trim()) &&
-      (item.category === "word" || item.category === "sentence")
-  );
+  return dedupeReviewItems(parsed);
 }
 
 function parseReviewLine(line: string): ReviewItem[] {

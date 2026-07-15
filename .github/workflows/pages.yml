@@ -44,7 +44,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm build
+        run: pnpm build:github
+        env:
+          VITE_REVIEW_SYNC_URL: ${{ vars.VITE_REVIEW_SYNC_URL }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

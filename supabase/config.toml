@@ -1,0 +1,2 @@
+[functions.review-state]
+verify_jwt = false
