@@ -1107,26 +1107,22 @@ function resetLessonForm() {
                 下载中
               </span>
             </div>
-            <el-tooltip content="回退到上一个图片或 emoji" placement="left">
-              <el-button
-                class="reference-back-button"
-                :icon="ArrowLeft"
-                circle
-                :disabled="!canRestorePreviousReferenceVisual"
-                aria-label="回退上一个参考图"
-                @click="restorePreviousReferenceVisual"
-              />
-            </el-tooltip>
-            <el-tooltip content="联网刷新参考图片" placement="left">
-              <el-button
-                class="reference-refresh-button"
-                :icon="RefreshLeft"
-                circle
-                :loading="isReferenceImageLoading"
-                aria-label="刷新参考图片"
-                @click="refreshReferenceImage"
-              />
-            </el-tooltip>
+            <el-button
+              class="reference-back-button"
+              :icon="ArrowLeft"
+              circle
+              :disabled="!canRestorePreviousReferenceVisual"
+              aria-label="回退上一个参考图"
+              @click="restorePreviousReferenceVisual"
+            />
+            <el-button
+              class="reference-refresh-button"
+              :icon="RefreshLeft"
+              circle
+              :loading="isReferenceImageLoading"
+              aria-label="刷新参考图片"
+              @click="refreshReferenceImage"
+            />
           </div>
 
           <div class="step-navigation" aria-label="复习步骤导航">
