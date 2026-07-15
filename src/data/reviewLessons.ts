@@ -31,14 +31,24 @@ export function buildReviewItem(
 ): ReviewItem {
   const normalizedEnglish = sanitizeReviewText(english).trim().replace(/\s+/g, " ");
   const normalizedChinese = sanitizeReviewText(chinese).trim();
+  const normalizedNote = sanitizeReviewText(note).trim();
+  const explicitEmoji = extractReviewEmoji(`${normalizedChinese} ${normalizedNote}`);
   return {
     id: createReviewId("item"),
     english: normalizedEnglish,
     chinese: normalizedChinese,
     category: category || inferCategory(normalizedEnglish),
-    emoji: pickEmoji(normalizedEnglish, normalizedChinese),
-    note: sanitizeReviewText(note).trim()
+    emoji: explicitEmoji || pickEmoji(normalizedEnglish, normalizedChinese),
+    note: normalizedNote
   };
+}
+
+function extractReviewEmoji(text: string) {
+  return (
+    text.match(
+      /(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|[#*0-9]\uFE0F?\u20E3|\uFE0F|\u200D)+/u
+    )?.[0] || ""
+  );
 }
 
 export function getReviewItemDedupeKey(english: string) {
@@ -456,9 +466,28 @@ function parseSinglePair(line: string): ReviewItem[] {
     return english ? [buildReviewItem(english, chinese)] : [];
   }
 
+  const emojiPair = parseEmojiPair(englishAndChinese);
+  if (emojiPair) return [emojiPair];
+
   const englishOnly = stripPromptPrefix(englishAndChinese);
   if (!shouldKeepEnglishOnly(englishOnly)) return [];
   return [buildReviewItem(englishOnly)];
+}
+
+function parseEmojiPair(text: string) {
+  const emojiMatch = text.match(
+    /\s+((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|\uFE0F|\u200D)+)\s*$/u
+  );
+  if (!emojiMatch || emojiMatch.index === undefined) return null;
+
+  const english = stripPromptPrefix(text.slice(0, emojiMatch.index));
+  const emoji = emojiMatch[1];
+  if (!english || !shouldKeepEnglishOnly(english)) return null;
+
+  return {
+    ...buildReviewItem(english, emoji),
+    emoji
+  };
 }
 
 function cleanLine(line: string) {

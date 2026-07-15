@@ -57,13 +57,22 @@ const {
 
 type SettingsSection = "lessons" | "add" | "learning";
 type ReferenceImageStatus = "idle" | "loading" | "error";
+type ReferenceDisplayMode = "emoji" | "image";
 type SyncStatus = "idle" | "loading" | "saving" | "offline" | "error" | "conflict";
+
+interface ReferenceImageHistoryEntry {
+  url: string;
+  title: string;
+  displayMode: ReferenceDisplayMode;
+}
 
 interface ReferenceImageState {
   url: string;
   title: string;
   cursor: number;
   status: ReferenceImageStatus;
+  displayMode: ReferenceDisplayMode;
+  history: ReferenceImageHistoryEntry[];
 }
 
 interface CommonsImageInfo {
@@ -216,9 +225,9 @@ const spellingPreferenceKey = "vancy-review-show-spelling";
 const studyModeRepeatCountKey = "vancy-study-mode-repeat-count";
 const studyModeIntervalSecondsKey = "vancy-study-mode-interval-seconds";
 const showSpelling = ref(window.localStorage.getItem(spellingPreferenceKey) === "true");
-const studyModeRepeatCount = ref(readNumberSetting(studyModeRepeatCountKey, 3, 1, 10));
+const studyModeRepeatCount = ref(readNumberSetting(studyModeRepeatCountKey, 2, 1, 10));
 const studyModeIntervalSeconds = ref(
-  readNumberSetting(studyModeIntervalSecondsKey, 2, 0.5, 10)
+  Math.round(readNumberSetting(studyModeIntervalSecondsKey, 2, 1, 10))
 );
 const isStudyModeActive = ref(false);
 let studyModeRunId = 0;
@@ -248,7 +257,7 @@ watch(showSpelling, (value) => {
 });
 
 watch(studyModeRepeatCount, (value) => {
-  const nextValue = Math.round(normalizeNumberSetting(value, 3, 1, 10));
+  const nextValue = Math.round(normalizeNumberSetting(value, 2, 1, 10));
   if (nextValue !== value) {
     studyModeRepeatCount.value = nextValue;
     return;
@@ -258,7 +267,7 @@ watch(studyModeRepeatCount, (value) => {
 });
 
 watch(studyModeIntervalSeconds, (value) => {
-  const nextValue = normalizeNumberSetting(value, 2, 0.5, 10);
+  const nextValue = Math.round(normalizeNumberSetting(value, 2, 1, 10));
   if (nextValue !== value) {
     studyModeIntervalSeconds.value = nextValue;
     return;
@@ -336,6 +345,26 @@ const currentReferenceImageUrl = computed(() => currentReferenceImageState.value
 
 const currentReferenceImageTitle = computed(() => currentReferenceImageState.value?.title || "");
 
+const currentReferenceEmoji = computed(() => {
+  const emoji = activeItem.value?.emoji || "";
+  return emoji && emoji !== "🔊" ? emoji : "";
+});
+
+const isCurrentReferenceEmojiVisible = computed(
+  () =>
+    Boolean(currentReferenceEmoji.value) &&
+    currentReferenceImageState.value?.displayMode !== "image"
+);
+
+const canRestorePreviousReferenceVisual = computed(() => {
+  const state = currentReferenceImageState.value;
+  if (!state) return false;
+  return (
+    state.history.length > 0 ||
+    (Boolean(currentReferenceEmoji.value) && state.displayMode === "image")
+  );
+});
+
 const isReferenceImageLoading = computed(
   () => currentReferenceImageState.value?.status === "loading"
 );
@@ -408,7 +437,9 @@ function buildReferenceImageStates(snapshots: Record<string, SyncedReferenceImag
         url: snapshot.url || "",
         title: snapshot.title || "",
         cursor: Number.isFinite(Number(snapshot.cursor)) ? Number(snapshot.cursor) : 0,
-        status: "idle"
+        status: "idle",
+        displayMode: snapshot.displayMode === "image" ? "image" : "emoji",
+        history: []
       };
       return states;
     },
@@ -423,7 +454,8 @@ function serializeReferenceImageSnapshots() {
       snapshots[itemId] = {
         url: state.url,
         title: state.title,
-        cursor: state.cursor
+        cursor: state.cursor,
+        displayMode: state.displayMode
       };
       return snapshots;
     },
@@ -441,11 +473,19 @@ function persistReferenceImageSnapshots() {
 }
 
 function applyReferenceImageSnapshots(snapshots: Record<string, SyncedReferenceImageState>) {
+  const localHistories = Object.entries(referenceImageStates).reduce<
+    Record<string, ReferenceImageHistoryEntry[]>
+  >((histories, [itemId, state]) => {
+    histories[itemId] = [...(state.history || [])];
+    return histories;
+  }, {});
+
   Object.keys(referenceImageStates).forEach((itemId) => {
     delete referenceImageStates[itemId];
   });
 
   Object.entries(buildReferenceImageStates(snapshots)).forEach(([itemId, state]) => {
+    state.history = localHistories[itemId] || [];
     referenceImageStates[itemId] = state;
   });
   persistReferenceImageSnapshots();
@@ -597,7 +637,9 @@ function getReferenceImageState(itemId: string) {
       url: "",
       title: "",
       cursor: 0,
-      status: "idle"
+      status: "idle",
+      displayMode: "emoji",
+      history: []
     };
   }
 
@@ -705,6 +747,11 @@ async function refreshReferenceImage() {
   if (state.status === "loading") return;
 
   const currentCursor = state.cursor;
+  const previousVisual: ReferenceImageHistoryEntry = {
+    url: state.url,
+    title: state.title,
+    displayMode: isCurrentReferenceEmojiVisible.value ? "emoji" : "image"
+  };
   state.cursor = currentCursor + 1;
   state.status = "loading";
 
@@ -719,14 +766,36 @@ async function refreshReferenceImage() {
     if (!imageUrl) throw new Error("No reference image found");
 
     await preloadReferenceImage(imageUrl);
+    state.history.push(previousVisual);
     state.url = imageUrl;
     state.title = selectedImage.title;
+    state.displayMode = "image";
     state.status = "idle";
     await saveCurrentReviewState("参考图片已同步", "参考图片已更新，本机暂存但云端未同步");
   } catch {
     state.status = "error";
     ElMessage.warning("参考图片下载失败，请稍后再试");
   }
+}
+
+async function restorePreviousReferenceVisual() {
+  const item = activeItem.value;
+  if (!item) return;
+
+  const state = getReferenceImageState(item.id);
+  const previousVisual = state.history.pop();
+  if (previousVisual) {
+    state.url = previousVisual.url;
+    state.title = previousVisual.title;
+    state.displayMode = previousVisual.displayMode;
+  } else if (currentReferenceEmoji.value && state.displayMode === "image") {
+    state.displayMode = "emoji";
+  } else {
+    return;
+  }
+
+  state.status = "idle";
+  await saveCurrentReviewState("已恢复上一个参考图", "参考图已恢复，本机暂存但云端未同步");
 }
 
 function waitForStudyMode(ms: number, runId: number) {
@@ -777,6 +846,8 @@ async function runStudyMode(runId: number) {
 
     if (!isStudyModeActive.value || runId !== studyModeRunId) return;
     if (itemOffset < totalItems - 1) {
+      await waitForStudyMode(studyModeIntervalSeconds.value * 1000, runId);
+      if (!isStudyModeActive.value || runId !== studyModeRunId) return;
       nextItem();
       await nextTick();
     }
@@ -1014,9 +1085,17 @@ function resetLessonForm() {
           </div>
 
           <div class="picture-tools">
-            <div class="picture-frame" :class="{ 'has-reference-image': currentReferenceImageUrl }">
+            <div
+              class="picture-frame"
+              :class="{
+                'has-reference-image': !isCurrentReferenceEmojiVisible && currentReferenceImageUrl
+              }"
+            >
+              <span v-if="isCurrentReferenceEmojiVisible" class="picture-emoji">
+                {{ currentReferenceEmoji }}
+              </span>
               <img
-                v-if="currentReferenceImageUrl"
+                v-else-if="currentReferenceImageUrl"
                 class="reference-image"
                 :src="currentReferenceImageUrl"
                 :alt="`${activeItem.english} 参考图片`"
@@ -1024,8 +1103,20 @@ function resetLessonForm() {
                 referrerpolicy="no-referrer"
               />
               <span v-else class="picture-emoji">{{ activeItem.emoji }}</span>
-              <span v-if="isReferenceImageLoading" class="picture-loading">下载中</span>
+              <span v-if="isReferenceImageLoading" class="picture-loading">
+                下载中
+              </span>
             </div>
+            <el-tooltip content="回退到上一个图片或 emoji" placement="left">
+              <el-button
+                class="reference-back-button"
+                :icon="ArrowLeft"
+                circle
+                :disabled="!canRestorePreviousReferenceVisual"
+                aria-label="回退上一个参考图"
+                @click="restorePreviousReferenceVisual"
+              />
+            </el-tooltip>
             <el-tooltip content="联网刷新参考图片" placement="left">
               <el-button
                 class="reference-refresh-button"
@@ -1312,10 +1403,10 @@ function resetLessonForm() {
                   <span>间隔秒数</span>
                   <el-input-number
                     v-model="studyModeIntervalSeconds"
-                    :min="0.5"
+                    :min="1"
                     :max="10"
-                    :step="0.5"
-                    :precision="1"
+                    :step="1"
+                    :precision="0"
                     controls-position="right"
                     aria-label="学习模式间隔秒数"
                   />

@@ -4,6 +4,7 @@ export interface SyncedReferenceImageState {
   url: string;
   title: string;
   cursor: number;
+  displayMode?: "emoji" | "image";
 }
 
 export interface ReviewSyncPayload {
@@ -156,7 +157,8 @@ function normalizeReferenceImages(value: unknown) {
       images[itemId] = {
         url: typeof image.url === "string" ? image.url : "",
         title: typeof image.title === "string" ? image.title : "",
-        cursor: normalizeRevision(image.cursor)
+        cursor: normalizeRevision(image.cursor),
+        displayMode: image.displayMode === "image" ? "image" : "emoji"
       };
       return images;
     },

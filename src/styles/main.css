@@ -510,9 +510,9 @@ textarea {
   white-space: nowrap;
 }
 
-.reference-refresh-button.el-button.is-circle {
+.reference-refresh-button.el-button.is-circle,
+.reference-back-button.el-button.is-circle {
   position: absolute;
-  right: 12px;
   bottom: 12px;
   z-index: 2;
   width: 40px;
@@ -525,7 +525,16 @@ textarea {
   box-shadow: 0 10px 24px rgba(57, 87, 123, 0.16);
 }
 
-.reference-refresh-button.el-button.is-circle:hover {
+.reference-refresh-button.el-button.is-circle {
+  right: 12px;
+}
+
+.reference-back-button.el-button.is-circle {
+  right: 60px;
+}
+
+.reference-refresh-button.el-button.is-circle:hover,
+.reference-back-button.el-button.is-circle:hover {
   border-color: rgba(47, 102, 239, 0.36);
   background: #ffffff;
 }
