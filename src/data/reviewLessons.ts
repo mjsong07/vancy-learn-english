@@ -1,4 +1,5 @@
 import type { ReviewItem, ReviewItemCategory, ReviewLesson } from "../types/review";
+import { findEnglishEmoji } from "./reviewEmojis";
 
 export const reviewStorageKey = "kid-english-review-lessons-v1";
 export const reviewProgressStorageKey = "kid-english-review-progress-v1";
@@ -553,6 +554,9 @@ function inferCategory(english: string): ReviewItemCategory {
 }
 
 function pickEmoji(english: string, chinese: string) {
+  const englishEmoji = findEnglishEmoji(english);
+  if (englishEmoji) return englishEmoji;
+
   const text = `${english} ${chinese}`.toLocaleLowerCase();
   const emojiMap: Array<[RegExp, string]> = [
     [/pineapple|菠萝/, "🍍"],

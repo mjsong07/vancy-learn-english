@@ -12,6 +12,7 @@
 - 自动记录每个复习日的学习进度
 - 数据保存在当前浏览器的 `localStorage`
 - 通过 Supabase Edge Function + PostgreSQL 同步复习内容和参考图片状态
+- 本地选择的图片压缩后上传到 Supabase Storage 的 `mybucket`
 - 内置 Letter Xx/Yy/Zz 字母单元和水果冰沙示例课
 
 ## 本地运行
@@ -57,6 +58,8 @@ supabase/migrations/20260715000000_create_review_shared_state.sql
 
 ### 2. 部署 Edge Function
 
+先在 Supabase Storage 中创建名为 `mybucket` 的 bucket。bucket 可以保持私有，图片上传和读取均由使用 service role 的 Edge Function 代理完成。
+
 先登录并关联 Supabase 项目：
 
 ```bash
@@ -76,7 +79,7 @@ npx supabase secrets set REVIEW_EDIT_CODE=<家庭编辑码>
 npx supabase secrets set ALLOWED_ORIGINS=https://mjsong07.github.io
 ```
 
-部署公开读取、编辑码保护写入的同步函数：
+部署公开读取、编辑码保护写入及 Storage 图片代理的同步函数：
 
 ```bash
 npx supabase functions deploy review-state --no-verify-jwt

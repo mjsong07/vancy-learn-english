@@ -252,7 +252,11 @@ export function useReviewLessons() {
     setActiveIndex(activeIndex.value - 1);
   }
 
-  async function addLesson(payload: { generatedContent: string; teacherText: string }) {
+  async function addLesson(payload: {
+    generatedContent: string;
+    teacherText: string;
+    dateLabel?: string;
+  }) {
     const generatedContent = payload.generatedContent.trim();
     const teacherText = payload.teacherText.trim();
     const parsedItems = parseReviewText(generatedContent);
@@ -274,7 +278,7 @@ export function useReviewLessons() {
     );
 
     const now = new Date();
-    const dateLabel = `${now.getMonth() + 1}月${now.getDate()}日`;
+    const dateLabel = payload.dateLabel?.trim() || `${now.getMonth() + 1}月${now.getDate()}日`;
     const wordCount = translatedItems.filter((item) => item.category === "word").length;
     const sentenceCount = translatedItems.filter((item) => item.category === "sentence").length;
     const lesson: ReviewLesson = {
@@ -296,9 +300,15 @@ export function useReviewLessons() {
 
   async function updateLesson(
     lessonId: string,
-    payload: { title: string; generatedContent: string; teacherText: string }
+    payload: {
+      title: string;
+      dateLabel: string;
+      generatedContent: string;
+      teacherText: string;
+    }
   ) {
     const title = payload.title.trim();
+    const dateLabel = payload.dateLabel.trim();
     const generatedContent = payload.generatedContent.trim();
     const teacherText = payload.teacherText.trim();
     const parsedItems = parseReviewText(generatedContent);
@@ -327,6 +337,7 @@ export function useReviewLessons() {
     const updatedLesson: ReviewLesson = {
       ...currentLesson,
       title,
+      dateLabel: dateLabel || currentLesson.dateLabel,
       summary: `已提取 ${wordCount} 个单词和 ${sentenceCount} 个句子。`,
       teacherText,
       generatedContent,

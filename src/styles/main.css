@@ -478,7 +478,7 @@ textarea {
 }
 
 .picture-frame.has-reference-image {
-  padding: 0;
+  padding: 12px 96px 12px 12px;
   background: #ffffff;
 }
 
@@ -488,9 +488,13 @@ textarea {
 }
 
 .reference-image {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .picture-loading {
@@ -590,6 +594,21 @@ textarea {
 .reference-image-picker-hint .el-button {
   flex: 0 0 auto;
   font-weight: 850;
+}
+
+.reference-image-picker-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.reference-image-picker-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+.reference-image-file-input {
+  display: none;
 }
 
 .reference-image-candidate-grid {
@@ -1552,6 +1571,10 @@ textarea {
   margin-bottom: 12px;
 }
 
+.lesson-date-picker.el-date-editor {
+  width: 100%;
+}
+
 .generated-content-label {
   display: flex;
   align-items: center;
@@ -1587,6 +1610,24 @@ textarea {
 
 .lesson-editor-form .el-form-item {
   margin-bottom: 14px;
+}
+
+.lesson-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.lesson-editor-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lesson-editor-footer-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 .word-extraction-dialog {
@@ -1712,6 +1753,11 @@ textarea {
 
   .reference-image-picker-hint > span {
     padding-top: 8px;
+  }
+
+  .reference-image-picker-actions {
+    flex-direction: column;
+    align-items: flex-end;
   }
 
   .reference-image-candidate-grid {

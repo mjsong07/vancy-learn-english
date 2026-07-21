@@ -39,6 +39,12 @@ interface SaveRemoteReviewStatePayload {
   payload: ReviewSyncPayload;
 }
 
+interface UploadReferenceImagePayload {
+  editCode: string;
+  fileName: string;
+  dataUrl: string;
+}
+
 const configuredReviewStateEndpoint = String(import.meta.env.VITE_REVIEW_SYNC_URL || "").trim();
 const reviewStateEndpoint =
   import.meta.env.DEV && configuredReviewStateEndpoint
@@ -115,6 +121,48 @@ export async function saveRemoteReviewState(payload: SaveRemoteReviewStatePayloa
   return readRemoteReviewState(response);
 }
 
+export async function uploadReferenceImage(payload: UploadReferenceImagePayload) {
+  assertReviewSyncConfigured();
+  const endpoint = appendReviewStateAction("upload-reference-image");
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  }).catch(() => {
+    throw new ReviewSyncError("unavailable", "图片上传服务暂不可用");
+  });
+
+  if (response.status === 401) {
+    throw new ReviewSyncError("unauthorized", "家庭编辑码不正确");
+  }
+
+  if (response.status === 400 || response.status === 413) {
+    throw new ReviewSyncError("invalid", "图片格式不正确或文件过大");
+  }
+
+  if (!response.ok) {
+    throw new ReviewSyncError("unavailable", "图片上传服务暂不可用");
+  }
+
+  try {
+    const result = (await response.json()) as { imagePath?: unknown; imageUrl?: unknown };
+    const imagePath =
+      typeof result.imagePath === "string"
+        ? result.imagePath
+        : extractReferenceImagePath(result.imageUrl);
+    if (imagePath) return buildReferenceImageUrl(imagePath);
+    if (typeof result.imageUrl === "string" && /^https:\/\//i.test(result.imageUrl)) {
+      return result.imageUrl;
+    }
+    throw new Error();
+  } catch {
+    throw new ReviewSyncError("unavailable", "图片上传结果读取失败");
+  }
+}
+
 export function isReviewSyncError(error: unknown): error is ReviewSyncError {
   return error instanceof ReviewSyncError;
 }
@@ -122,6 +170,27 @@ export function isReviewSyncError(error: unknown): error is ReviewSyncError {
 function assertReviewSyncConfigured() {
   if (!reviewStateEndpoint) {
     throw new ReviewSyncError("unavailable", "尚未配置 Supabase 同步服务");
+  }
+}
+
+function appendReviewStateAction(action: string) {
+  const separator = reviewStateEndpoint.includes("?") ? "&" : "?";
+  return `${reviewStateEndpoint}${separator}action=${encodeURIComponent(action)}`;
+}
+
+function buildReferenceImageUrl(imagePath: string) {
+  const endpoint = new URL(configuredReviewStateEndpoint || reviewStateEndpoint, window.location.origin);
+  endpoint.searchParams.set("action", "reference-image");
+  endpoint.searchParams.set("path", imagePath);
+  return endpoint.toString();
+}
+
+function extractReferenceImagePath(imageUrl: unknown) {
+  if (typeof imageUrl !== "string" || !imageUrl) return "";
+  try {
+    return new URL(imageUrl, window.location.origin).searchParams.get("path") || "";
+  } catch {
+    return "";
   }
 }
 

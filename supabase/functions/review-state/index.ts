@@ -8,6 +8,8 @@ interface ReviewStateRow {
 
 const stateId = "default";
 const tableName = "review_shared_state";
+const referenceImageBucket = "mybucket";
+const maxReferenceImageBytes = 700_000;
 const defaultAllowedOrigins = [
   "https://mjsong07.github.io",
   "https://127.0.0.1:5173",
@@ -16,6 +18,8 @@ const defaultAllowedOrigins = [
 
 Deno.serve(async (request) => {
   const responseHeaders = buildResponseHeaders(request);
+  const requestUrl = new URL(request.url);
+  const action = requestUrl.searchParams.get("action") || "";
 
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: responseHeaders });
@@ -34,6 +38,27 @@ Deno.serve(async (request) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false }
   });
+
+  if (request.method === "GET" && action === "reference-image") {
+    const path = requestUrl.searchParams.get("path") || "";
+    if (!isReferenceImagePath(path)) {
+      return jsonResponse({ error: "Invalid image path" }, 400, responseHeaders);
+    }
+
+    const { data, error } = await supabase.storage.from(referenceImageBucket).download(path);
+    if (error || !data) {
+      return jsonResponse({ error: "Reference image not found" }, 404, responseHeaders);
+    }
+
+    const imageHeaders = new Headers(responseHeaders);
+    imageHeaders.set("Content-Type", data.type || "image/webp");
+    imageHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
+    return new Response(data, { status: 200, headers: imageHeaders });
+  }
+
+  if (request.method === "POST" && action === "upload-reference-image") {
+    return uploadReferenceImage(request, supabase, responseHeaders);
+  }
 
   if (request.method === "GET") {
     const state = await readState(supabase);
@@ -88,6 +113,46 @@ Deno.serve(async (request) => {
 
   return jsonResponse(toRemoteState(data), 200, responseHeaders);
 });
+
+async function uploadReferenceImage(
+  request: Request,
+  supabase: ReturnType<typeof createClient>,
+  responseHeaders: Record<string, string>
+) {
+  const reviewEditCode = Deno.env.get("REVIEW_EDIT_CODE");
+  if (!reviewEditCode) {
+    return jsonResponse({ error: "REVIEW_EDIT_CODE secret is missing" }, 500, responseHeaders);
+  }
+
+  const body = await readRequestJson(request);
+  if (!isRecord(body) || typeof body.dataUrl !== "string") {
+    return jsonResponse({ error: "Invalid image payload" }, 400, responseHeaders);
+  }
+
+  if (!safeEqual(String(body.editCode || ""), reviewEditCode)) {
+    return jsonResponse({ error: "Invalid edit code" }, 401, responseHeaders);
+  }
+
+  const imageBytes = decodeWebpDataUrl(body.dataUrl);
+  if (!imageBytes) {
+    return jsonResponse({ error: "Invalid WebP image" }, 400, responseHeaders);
+  }
+  if (imageBytes.byteLength > maxReferenceImageBytes) {
+    return jsonResponse({ error: "Image is too large" }, 413, responseHeaders);
+  }
+
+  const path = `reference-images/${Date.now()}-${crypto.randomUUID()}.webp`;
+  const { error } = await supabase.storage.from(referenceImageBucket).upload(path, imageBytes, {
+    cacheControl: "31536000",
+    contentType: "image/webp",
+    upsert: false
+  });
+  if (error) {
+    return jsonResponse({ error: "Failed to upload reference image" }, 500, responseHeaders);
+  }
+
+  return jsonResponse({ imagePath: path }, 200, responseHeaders);
+}
 
 function buildResponseHeaders(request: Request) {
   const configuredOrigins = (Deno.env.get("ALLOWED_ORIGINS") || "")
@@ -158,6 +223,22 @@ function safeEqual(left: string, right: string) {
   }
 
   return difference === 0;
+}
+
+function decodeWebpDataUrl(dataUrl: string) {
+  const match = dataUrl.match(/^data:image\/webp;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+
+  try {
+    const binary = atob(match[1]);
+    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
+function isReferenceImagePath(path: string) {
+  return /^reference-images\/[0-9]+-[0-9a-f-]+\.webp$/i.test(path);
 }
 
 function jsonResponse(body: unknown, status: number, headers: Record<string, string>) {

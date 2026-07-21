@@ -12,7 +12,8 @@ import {
   RefreshLeft,
   Search,
   Setting,
-  SwitchButton
+  SwitchButton,
+  Upload
 } from "@element-plus/icons-vue";
 import { useReviewLessons } from "./composables/useReviewLessons";
 import {
@@ -27,7 +28,8 @@ import {
   getStoredReviewEditCode,
   isReviewSyncError,
   saveRemoteReviewState,
-  storeReviewEditCode
+  storeReviewEditCode,
+  uploadReferenceImage
 } from "./services/reviewSync";
 import { speak } from "./services/speech";
 import type { ReviewItem, ReviewLesson } from "./types/review";
@@ -67,7 +69,8 @@ type ReferenceImageSource =
   | "unsplash"
   | "baidu"
   | "sogou"
-  | "so360";
+  | "so360"
+  | "local";
 type WordExtractionTarget = "create" | "edit";
 type SyncStatus = "idle" | "loading" | "saving" | "offline" | "error" | "conflict";
 
@@ -133,6 +136,8 @@ const referenceImageSearchError = ref("");
 const isReferenceImageSearching = ref(false);
 const selectedReferenceImageUrl = ref("");
 const externalReferenceImageUrl = ref("");
+const localReferenceImageInput = ref<HTMLInputElement | null>(null);
+const isLocalReferenceImageProcessing = ref(false);
 const wordExtractionDialogOpen = ref(false);
 const wordExtractionSourceText = ref("");
 const extractedEnglishWordText = ref("");
@@ -335,6 +340,7 @@ watch(studyModeIntervalSeconds, (value) => {
 });
 
 const lessonForm = reactive({
+  reviewDate: getTodayDateValue(),
   generatedContent: "",
   teacherText: ""
 });
@@ -344,9 +350,34 @@ const lessonEditorOpen = ref(false);
 const lessonEditorForm = reactive({
   lessonId: "",
   title: "",
+  reviewDate: "",
+  originalDateLabel: "",
   generatedContent: "",
   teacherText: ""
 });
+
+function getTodayDateValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatReviewDateLabel(dateValue: string) {
+  const match = dateValue.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  return `${Number(match[1])}月${Number(match[2])}日`;
+}
+
+function parseReviewDateLabel(dateLabel: string) {
+  const match = dateLabel.match(/^(\d{1,2})月(\d{1,2})日$/);
+  if (!match) return "";
+  const year = new Date().getFullYear();
+  const month = String(Number(match[1])).padStart(2, "0");
+  const day = String(Number(match[2])).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 onMounted(() => {
   void loadRemoteReviewState({ silent: true });
@@ -1016,6 +1047,94 @@ function applyExternalReferenceImageUrl() {
   });
 }
 
+function openLocalReferenceImagePicker() {
+  localReferenceImageInput.value?.click();
+}
+
+async function handleLocalReferenceImageChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    ElMessage.warning("请选择图片文件");
+    return;
+  }
+  if (file.size > 15 * 1024 * 1024) {
+    ElMessage.warning("图片不能超过 15MB");
+    return;
+  }
+
+  isLocalReferenceImageProcessing.value = true;
+  try {
+    const dataUrl = await compressLocalReferenceImage(file);
+    const editCode = await getReviewEditCode();
+    if (!editCode) {
+      ElMessage.warning("未输入家庭编辑码，图片没有上传");
+      return;
+    }
+    const imageUrl = await uploadReferenceImage({ editCode, fileName: file.name, dataUrl });
+    storeReviewEditCode(editCode);
+    await selectReferenceImage({
+      url: imageUrl,
+      title: file.name,
+      source: "local",
+      sourceLabel: "Supabase Storage"
+    });
+  } catch (error) {
+    if (isReviewSyncError(error)) {
+      if (error.code === "unauthorized") {
+        clearStoredReviewEditCode();
+        ElMessage.error("家庭编辑码不正确，图片没有上传");
+        return;
+      }
+      ElMessage.warning(error.message);
+      return;
+    }
+    ElMessage.warning("图片处理失败，请更换图片后重试");
+  } finally {
+    isLocalReferenceImageProcessing.value = false;
+  }
+}
+
+function compressLocalReferenceImage(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      const maxDimension = 720;
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Canvas is unavailable"));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, width, height);
+      URL.revokeObjectURL(objectUrl);
+      const result = canvas.toDataURL("image/webp", 0.72);
+      if (!result || result.length > 900_000) {
+        reject(new Error("Compressed image is too large"));
+        return;
+      }
+      resolve(result);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Image decode failed"));
+    };
+    image.src = objectUrl;
+  });
+}
+
 async function selectReferenceImage(candidate: ReferenceImageCandidate) {
   const item = activeItem.value;
   if (!item || selectedReferenceImageUrl.value) return;
@@ -1165,7 +1284,11 @@ async function handleCreateLesson() {
   }
 
   isCreatingLesson.value = true;
-  const result = await addLesson({ generatedContent, teacherText }).finally(() => {
+  const result = await addLesson({
+    generatedContent,
+    teacherText,
+    dateLabel: formatReviewDateLabel(lessonForm.reviewDate)
+  }).finally(() => {
     isCreatingLesson.value = false;
   });
   if (!result) {
@@ -1195,6 +1318,8 @@ function openLessonEditor(lesson: ReviewLesson) {
   selectLesson(lesson.id);
   lessonEditorForm.lessonId = lesson.id;
   lessonEditorForm.title = lesson.title;
+  lessonEditorForm.reviewDate = parseReviewDateLabel(lesson.dateLabel);
+  lessonEditorForm.originalDateLabel = lesson.dateLabel;
   lessonEditorForm.generatedContent = getLessonGeneratedContent(lesson);
   lessonEditorForm.teacherText = lesson.teacherText?.trim() || "";
   lessonEditorOpen.value = true;
@@ -1295,6 +1420,8 @@ async function handleUpdateLesson() {
   isUpdatingLesson.value = true;
   const result = await updateLesson(lessonEditorForm.lessonId, {
     title,
+    dateLabel:
+      formatReviewDateLabel(lessonEditorForm.reviewDate) || lessonEditorForm.originalDateLabel,
     generatedContent,
     teacherText: lessonEditorForm.teacherText
   }).finally(() => {
@@ -1324,7 +1451,26 @@ function handleSelectItem(itemIndex: number) {
 }
 
 async function handleDeleteLesson(lessonId: string) {
+  const lesson = lessons.value.find((candidate) => candidate.id === lessonId);
+  if (!lesson || lessons.value.length <= 1) return;
+
+  try {
+    await ElMessageBox.confirm(
+      `删除“${lesson.title}”后无法恢复，确定继续吗？`,
+      "删除复习日",
+      {
+        confirmButtonText: "删除",
+        cancelButtonText: "取消",
+        confirmButtonClass: "el-button--danger",
+        type: "warning"
+      }
+    );
+  } catch {
+    return;
+  }
+
   deleteLesson(lessonId);
+  lessonEditorOpen.value = false;
   await saveCurrentReviewState("已删除复习日并同步", "已删除复习日，本机暂存但云端未同步");
 }
 
@@ -1353,6 +1499,7 @@ async function handleRestoreSeeds() {
 }
 
 function resetLessonForm() {
+  lessonForm.reviewDate = getTodayDateValue();
   lessonForm.generatedContent = "";
   lessonForm.teacherText = "";
 }
@@ -1585,15 +1732,32 @@ function resetLessonForm() {
               : `为 ${activeItem?.english} 选择一张清晰、易识别的图片`
           }}
         </span>
-        <el-button
-          v-if="!isExternalReferenceImageSource"
-          :icon="RefreshLeft"
-          text
-          :loading="isReferenceImageSearching"
-          @click="searchNextReferenceImageBatch"
-        >
-          换一批
-        </el-button>
+        <div class="reference-image-picker-actions">
+          <el-button
+            :icon="Upload"
+            text
+            :loading="isLocalReferenceImageProcessing"
+            @click="openLocalReferenceImagePicker"
+          >
+            本地上传
+          </el-button>
+          <el-button
+            v-if="!isExternalReferenceImageSource"
+            :icon="RefreshLeft"
+            text
+            :loading="isReferenceImageSearching"
+            @click="searchNextReferenceImageBatch"
+          >
+            换一批
+          </el-button>
+        </div>
+        <input
+          ref="localReferenceImageInput"
+          class="reference-image-file-input"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
+          @change="handleLocalReferenceImageChange"
+        />
       </div>
 
       <section
@@ -1751,15 +1915,6 @@ function resetLessonForm() {
                     aria-label="编辑复习日"
                     @click.stop="openLessonEditor(lesson)"
                   />
-                  <el-button
-                    v-if="lessons.length > 1"
-                    class="settings-lesson-delete"
-                    :icon="Delete"
-                    circle
-                    text
-                    aria-label="删除复习日"
-                    @click.stop="handleDeleteLesson(lesson.id)"
-                  />
                 </div>
               </div>
             </nav>
@@ -1813,6 +1968,17 @@ function resetLessonForm() {
             </div>
 
             <el-form label-position="top" class="lesson-form settings-lesson-form">
+              <el-form-item label="副标题（日期）">
+                <el-date-picker
+                  v-model="lessonForm.reviewDate"
+                  class="lesson-date-picker"
+                  type="date"
+                  format="YYYY年M月D日"
+                  value-format="YYYY-MM-DD"
+                  placeholder="选择复习日期"
+                  :clearable="false"
+                />
+              </el-form-item>
               <el-form-item>
                 <template #label>
                   <span class="generated-content-label">
@@ -1943,6 +2109,17 @@ function resetLessonForm() {
             placeholder="请输入复习日标题"
           />
         </el-form-item>
+        <el-form-item label="副标题（日期）">
+          <el-date-picker
+            v-model="lessonEditorForm.reviewDate"
+            class="lesson-date-picker"
+            type="date"
+            format="YYYY年M月D日"
+            value-format="YYYY-MM-DD"
+            placeholder="选择复习日期"
+            :clearable="false"
+          />
+        </el-form-item>
         <el-form-item>
           <template #label>
             <span class="generated-content-label">
@@ -1971,10 +2148,25 @@ function resetLessonForm() {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="lessonEditorOpen = false">取消</el-button>
-        <el-button type="primary" :loading="isUpdatingLesson" @click="handleUpdateLesson">
-          保存修改
-        </el-button>
+        <div class="lesson-editor-footer">
+          <el-button
+            v-if="lessons.length > 1"
+            type="danger"
+            plain
+            :icon="Delete"
+            :disabled="isUpdatingLesson"
+            @click="handleDeleteLesson(lessonEditorForm.lessonId)"
+          >
+            删除复习日
+          </el-button>
+          <span v-else />
+          <div class="lesson-editor-footer-actions">
+            <el-button @click="lessonEditorOpen = false">取消</el-button>
+            <el-button type="primary" :loading="isUpdatingLesson" @click="handleUpdateLesson">
+              保存修改
+            </el-button>
+          </div>
+        </div>
       </template>
     </el-dialog>
 
