@@ -10,6 +10,7 @@ import {
   Headset,
   Microphone,
   RefreshLeft,
+  Search,
   Setting,
   SwitchButton
 } from "@element-plus/icons-vue";
@@ -58,6 +59,16 @@ const {
 type SettingsSection = "lessons" | "add" | "learning";
 type ReferenceImageStatus = "idle" | "loading" | "error";
 type ReferenceDisplayMode = "emoji" | "image";
+type ReferenceImageSource =
+  | "openverse"
+  | "wikimedia"
+  | "pixabay"
+  | "pexels"
+  | "unsplash"
+  | "baidu"
+  | "sogou"
+  | "so360";
+type WordExtractionTarget = "create" | "edit";
 type SyncStatus = "idle" | "loading" | "saving" | "offline" | "error" | "conflict";
 
 interface ReferenceImageHistoryEntry {
@@ -92,8 +103,41 @@ interface CommonsImageResponse {
   };
 }
 
+interface OpenverseImage {
+  title?: string;
+  thumbnail?: string;
+  url?: string;
+  source?: string;
+  mature?: boolean;
+}
+
+interface OpenverseImageResponse {
+  results?: OpenverseImage[];
+}
+
+interface ReferenceImageCandidate {
+  url: string;
+  title: string;
+  source: ReferenceImageSource;
+  sourceLabel: string;
+}
+
 const settingsDrawerOpen = ref(false);
 const dailyContentDrawerOpen = ref(false);
+const referenceImagePickerOpen = ref(false);
+const referenceImageSource = ref<ReferenceImageSource>("wikimedia");
+const referenceImageSearchQuery = ref("");
+const referenceImageCandidates = ref<ReferenceImageCandidate[]>([]);
+const referenceImageSearchCursor = ref(0);
+const referenceImageSearchError = ref("");
+const isReferenceImageSearching = ref(false);
+const selectedReferenceImageUrl = ref("");
+const externalReferenceImageUrl = ref("");
+const wordExtractionDialogOpen = ref(false);
+const wordExtractionSourceText = ref("");
+const extractedEnglishWordText = ref("");
+const wordExtractionTarget = ref<WordExtractionTarget>("create");
+const extractedEnglishWordCount = computed(() => getExtractedWordLines().length);
 const settingsSection = ref<SettingsSection>("lessons");
 const referenceImageStorageKey = "kid-english-review-reference-images-v1";
 const referenceImageStates = reactive<Record<string, ReferenceImageState>>(
@@ -106,6 +150,20 @@ const settingsOptions: Array<{ label: string; value: SettingsSection }> = [
   { label: "复习内容", value: "lessons" },
   { label: "添加复习日", value: "add" },
   { label: "学习设置", value: "learning" }
+];
+const referenceImageSourceOptions: Array<{
+  label: string;
+  value: ReferenceImageSource;
+  kind: "integrated" | "external";
+}> = [
+  { label: "Wikimedia Commons", value: "wikimedia", kind: "integrated" },
+  { label: "Openverse 开放图库", value: "openverse", kind: "integrated" },
+  { label: "Pixabay 素材图库", value: "pixabay", kind: "external" },
+  { label: "Pexels 摄影图库", value: "pexels", kind: "external" },
+  { label: "Unsplash 摄影图库", value: "unsplash", kind: "external" },
+  { label: "百度图片（国内）", value: "baidu", kind: "external" },
+  { label: "搜狗图片（国内）", value: "sogou", kind: "external" },
+  { label: "360 图片（国内）", value: "so360", kind: "external" }
 ];
 const referenceImageStopWords = new Set([
   "a",
@@ -280,6 +338,8 @@ const lessonForm = reactive({
   generatedContent: "",
   teacherText: ""
 });
+const isCreatingLesson = ref(false);
+const isUpdatingLesson = ref(false);
 const lessonEditorOpen = ref(false);
 const lessonEditorForm = reactive({
   lessonId: "",
@@ -340,6 +400,21 @@ const currentReferenceImageState = computed(() => {
   const item = activeItem.value;
   return item ? getReferenceImageState(item.id) : null;
 });
+
+const currentReferenceImageSourceOption = computed(() =>
+  referenceImageSourceOptions.find((option) => option.value === referenceImageSource.value)
+);
+
+const isExternalReferenceImageSource = computed(
+  () => currentReferenceImageSourceOption.value?.kind === "external"
+);
+
+const currentExternalImageSearchUrl = computed(() =>
+  buildExternalImageSearchUrl(
+    referenceImageSource.value,
+    referenceImageSearchQuery.value.trim() || activeItem.value?.english || ""
+  )
+);
 
 const currentReferenceImageUrl = computed(() => currentReferenceImageState.value?.url || "");
 
@@ -681,8 +756,8 @@ function getReferenceImageWords(text: string, stopWords: Set<string>) {
     .filter((word) => word.length > 1 && !stopWords.has(word));
 }
 
-function getReferenceImageSearchQueries(item: ReviewItem) {
-  const baseQuery = getReferenceImageQuery(item);
+function getReferenceImageSearchQueries(item: ReviewItem, queryOverride = "") {
+  const baseQuery = queryOverride.trim() || getReferenceImageQuery(item);
   const preferredQueries = preferredReferenceImageStyles.map((style) => `${baseQuery} ${style}`);
   const fallbackQueries = fallbackReferenceImageStyles.map((style) => `${baseQuery} ${style}`);
   return Array.from(new Set([...preferredQueries, ...fallbackQueries, baseQuery]));
@@ -704,13 +779,81 @@ function buildCommonsSearchUrl(query: string, cursor: number) {
   return searchUrl.toString();
 }
 
-async function fetchReferenceImages(item: ReviewItem, cursor: number) {
-  for (const query of getReferenceImageSearchQueries(item)) {
-    const images = await fetchCommonsReferenceImages(query, item.english, cursor);
-    if (images.length) return images;
+function buildOpenverseSearchUrl(query: string, cursor: number) {
+  const endpoint = import.meta.env.DEV
+    ? "/api/openverse/v1/images/"
+    : "https://api.openverse.org/v1/images/";
+  const searchUrl = new URL(endpoint, window.location.origin);
+  searchUrl.searchParams.set("q", query);
+  searchUrl.searchParams.set("page", String((cursor % 20) + 1));
+  searchUrl.searchParams.set("page_size", "12");
+  searchUrl.searchParams.set("mature", "false");
+  return searchUrl.toString();
+}
+
+async function fetchReferenceImages(
+  item: ReviewItem,
+  cursor: number,
+  source: ReferenceImageSource,
+  queryOverride = ""
+) {
+  const collectedImages: ReferenceImageCandidate[] = [];
+  const seenUrls = new Set<string>();
+
+  for (const query of getReferenceImageSearchQueries(item, queryOverride)) {
+    let images: ReferenceImageCandidate[];
+    try {
+      if (source === "openverse") {
+        images = await fetchOpenverseReferenceImages(query, item.english, cursor);
+      } else if (source === "wikimedia") {
+        images = await fetchCommonsReferenceImages(query, item.english, cursor);
+      } else {
+        return [];
+      }
+    } catch (error) {
+      if (source !== "openverse") {
+        throw error instanceof Error ? error : new Error("Reference image request failed");
+      }
+      images = (await fetchCommonsReferenceImages(query, item.english, cursor)).map((image) => ({
+        ...image,
+        sourceLabel: "Wikimedia Commons · 自动兜底"
+      }));
+    }
+
+    images.forEach((image) => {
+      if (seenUrls.has(image.url)) return;
+      seenUrls.add(image.url);
+      collectedImages.push(image);
+    });
+    if (collectedImages.length >= 4) return collectedImages.slice(0, 4);
   }
 
-  return [];
+  return collectedImages.slice(0, 4);
+}
+
+function buildExternalImageSearchUrl(source: ReferenceImageSource, query: string) {
+  if (!query) return "";
+
+  const encodedQuery = encodeURIComponent(query);
+  if (source === "pixabay") {
+    return `https://pixabay.com/images/search/${encodedQuery}/`;
+  }
+  if (source === "pexels") {
+    return `https://www.pexels.com/search/${encodedQuery}/`;
+  }
+  if (source === "unsplash") {
+    return `https://unsplash.com/s/photos/${encodedQuery}`;
+  }
+  if (source === "baidu") {
+    return `https://image.baidu.com/search/index?tn=baiduimage&word=${encodedQuery}`;
+  }
+  if (source === "sogou") {
+    return `https://pic.sogou.com/pics?query=${encodedQuery}`;
+  }
+  if (source === "so360") {
+    return `https://image.so.com/i?q=${encodedQuery}`;
+  }
+  return "";
 }
 
 async function fetchCommonsReferenceImages(query: string, fallbackTitle: string, cursor: number) {
@@ -719,62 +862,188 @@ async function fetchCommonsReferenceImages(query: string, fallbackTitle: string,
 
   const payload = (await response.json()) as CommonsImageResponse;
   return Object.values(payload.query?.pages || {})
-    .map((page) => ({
-      title: page.title?.replace(/^File:/i, "") || fallbackTitle,
-      info: page.imageinfo?.[0]
-    }))
+    .map((page) => {
+      const info = page.imageinfo?.[0];
+      return {
+        title: page.title?.replace(/^File:/i, "") || fallbackTitle,
+        info
+      };
+    })
     .filter(({ info }) => {
       if (!info?.mime?.startsWith("image/")) return false;
       if (/svg/i.test(info.mime) && !info.thumburl) return false;
       return Boolean(info.thumburl || info.url);
-    });
+    })
+    .map(({ title, info }) => ({
+      url: info?.thumburl || info?.url || "",
+      title,
+      source: "wikimedia" as const,
+      sourceLabel: "Wikimedia Commons"
+    }));
+}
+
+async function fetchOpenverseReferenceImages(
+  query: string,
+  fallbackTitle: string,
+  cursor: number
+) {
+  const response = await fetch(buildOpenverseSearchUrl(query, cursor), {
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!response.ok) throw new Error("Openverse image request failed");
+
+  const payload = (await response.json()) as OpenverseImageResponse;
+  return (payload.results || [])
+    .filter((image) => !image.mature && Boolean(image.thumbnail || image.url))
+    .map((image) => ({
+      url: image.thumbnail || image.url || "",
+      title: image.title || fallbackTitle,
+      source: "openverse" as const,
+      sourceLabel: image.source ? `Openverse · ${image.source}` : "Openverse"
+    }));
 }
 
 function preloadReferenceImage(src: string) {
   return new Promise<void>((resolve, reject) => {
     const image = new Image();
+    image.referrerPolicy = "no-referrer";
     image.onload = () => resolve();
     image.onerror = () => reject(new Error("Reference image preload failed"));
     image.src = src;
   });
 }
 
-async function refreshReferenceImage() {
+async function searchReferenceImageCandidates(options: { reset?: boolean } = {}) {
+  const item = activeItem.value;
+  if (!item) return;
+  if (isExternalReferenceImageSource.value) {
+    referenceImageCandidates.value = [];
+    referenceImageSearchError.value = "";
+    return;
+  }
+
+  if (options.reset) referenceImageSearchCursor.value = 0;
+  isReferenceImageSearching.value = true;
+  referenceImageSearchError.value = "";
+  referenceImageCandidates.value = [];
+
+  try {
+    let images = await fetchReferenceImages(
+      item,
+      referenceImageSearchCursor.value,
+      referenceImageSource.value,
+      referenceImageSearchQuery.value
+    );
+    if (!images.length && referenceImageSearchCursor.value > 0) {
+      referenceImageSearchCursor.value = 0;
+      images = await fetchReferenceImages(
+        item,
+        0,
+        referenceImageSource.value,
+        referenceImageSearchQuery.value
+      );
+    }
+
+    referenceImageCandidates.value = images;
+    if (!images.length) referenceImageSearchError.value = "没有找到合适的图片，请更换关键词或来源";
+  } catch (error) {
+    referenceImageSearchError.value =
+      error instanceof Error && error.message.includes("API 密钥")
+        ? error.message
+        : "图片搜索失败，请切换来源后重试";
+  } finally {
+    isReferenceImageSearching.value = false;
+  }
+}
+
+function openReferenceImagePicker() {
   const item = activeItem.value;
   if (!item) return;
 
-  const state = getReferenceImageState(item.id);
-  if (state.status === "loading") return;
+  referenceImageSearchQuery.value = getReferenceImageQuery(item);
+  externalReferenceImageUrl.value = "";
+  referenceImageSearchCursor.value = 0;
+  referenceImagePickerOpen.value = true;
+  void searchReferenceImageCandidates({ reset: true });
+}
 
-  const currentCursor = state.cursor;
+function searchNextReferenceImageBatch() {
+  referenceImageSearchCursor.value += 1;
+  void searchReferenceImageCandidates();
+}
+
+function handleReferenceImageSourceChange() {
+  externalReferenceImageUrl.value = "";
+  if (isExternalReferenceImageSource.value) {
+    referenceImageCandidates.value = [];
+    referenceImageSearchError.value = "";
+    referenceImageSearchCursor.value = 0;
+    return;
+  }
+  void searchReferenceImageCandidates({ reset: true });
+}
+
+function handleReferenceImageSearch() {
+  if (isExternalReferenceImageSource.value) {
+    openExternalImageSearch();
+    return;
+  }
+  void searchReferenceImageCandidates({ reset: true });
+}
+
+function openExternalImageSearch() {
+  if (!currentExternalImageSearchUrl.value) {
+    ElMessage.warning("请先输入图片搜索关键词");
+    return;
+  }
+
+  window.open(currentExternalImageSearchUrl.value, "_blank", "noopener,noreferrer");
+}
+
+function applyExternalReferenceImageUrl() {
+  const imageUrl = externalReferenceImageUrl.value.trim();
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    ElMessage.warning("请输入以 http:// 或 https:// 开头的图片地址");
+    return;
+  }
+
+  const sourceOption = currentReferenceImageSourceOption.value;
+  void selectReferenceImage({
+    url: imageUrl,
+    title: referenceImageSearchQuery.value.trim() || activeItem.value?.english || "参考图片",
+    source: referenceImageSource.value,
+    sourceLabel: sourceOption?.label || "外部图片"
+  });
+}
+
+async function selectReferenceImage(candidate: ReferenceImageCandidate) {
+  const item = activeItem.value;
+  if (!item || selectedReferenceImageUrl.value) return;
+
+  const state = getReferenceImageState(item.id);
   const previousVisual: ReferenceImageHistoryEntry = {
     url: state.url,
     title: state.title,
     displayMode: isCurrentReferenceEmojiVisible.value ? "emoji" : "image"
   };
-  state.cursor = currentCursor + 1;
+  selectedReferenceImageUrl.value = candidate.url;
   state.status = "loading";
 
   try {
-    let images = await fetchReferenceImages(item, currentCursor);
-    if (!images.length && currentCursor > 0) {
-      images = await fetchReferenceImages(item, 0);
-    }
-
-    const selectedImage = images[currentCursor % images.length];
-    const imageUrl = selectedImage?.info?.thumburl || selectedImage?.info?.url;
-    if (!imageUrl) throw new Error("No reference image found");
-
-    await preloadReferenceImage(imageUrl);
+    await preloadReferenceImage(candidate.url);
     state.history.push(previousVisual);
-    state.url = imageUrl;
-    state.title = selectedImage.title;
+    state.url = candidate.url;
+    state.title = candidate.title;
+    state.cursor = referenceImageSearchCursor.value + 1;
     state.displayMode = "image";
     state.status = "idle";
+    referenceImagePickerOpen.value = false;
     await saveCurrentReviewState("参考图片已同步", "参考图片已更新，本机暂存但云端未同步");
   } catch {
     state.status = "error";
-    ElMessage.warning("参考图片下载失败，请稍后再试");
+    ElMessage.warning("图片加载失败，请选择其他图片");
+  } finally {
+    selectedReferenceImageUrl.value = "";
   }
 }
 
@@ -895,10 +1164,16 @@ async function handleCreateLesson() {
     return;
   }
 
-  const lesson = addLesson({ generatedContent, teacherText });
-  if (!lesson) {
-    ElMessage.warning("生成内容中没有识别到带中文翻译的单词或句子");
+  isCreatingLesson.value = true;
+  const result = await addLesson({ generatedContent, teacherText }).finally(() => {
+    isCreatingLesson.value = false;
+  });
+  if (!result) {
+    ElMessage.warning("生成内容中没有识别到英文单词或句子");
     return;
+  }
+  if (result.translationFailedCount) {
+    ElMessage.warning("有 " + result.translationFailedCount + " 条内容暂时未能自动翻译");
   }
 
   resetLessonForm();
@@ -925,6 +1200,85 @@ function openLessonEditor(lesson: ReviewLesson) {
   lessonEditorOpen.value = true;
 }
 
+function openWordExtractionDialog(target: WordExtractionTarget) {
+  wordExtractionTarget.value = target;
+  wordExtractionSourceText.value =
+    target === "create" ? lessonForm.teacherText : lessonEditorForm.teacherText;
+  extractedEnglishWordText.value = "";
+  wordExtractionDialogOpen.value = true;
+}
+
+function extractEnglishWords(sourceText: string) {
+  const matches = sourceText.match(/[A-Za-z]+(?:['’-][A-Za-z]+)*/g) || [];
+  const seenWords = new Set<string>();
+
+  return matches.reduce<string[]>((words, match) => {
+    const normalizedWord = match
+      .replace(/[’]/g, "'")
+      .replace(/[–—]/g, "-")
+      .toLocaleLowerCase();
+    if (!normalizedWord || seenWords.has(normalizedWord)) return words;
+
+    seenWords.add(normalizedWord);
+    words.push(normalizedWord);
+    return words;
+  }, []);
+}
+
+function convertSourceTextToWords() {
+  const words = extractEnglishWords(wordExtractionSourceText.value);
+  if (!words.length) {
+    extractedEnglishWordText.value = "";
+    ElMessage.warning("原文中没有识别到英文单词");
+    return;
+  }
+
+  extractedEnglishWordText.value = words.join("\n");
+}
+
+function handleWordExtractionSourceInput() {
+  extractedEnglishWordText.value = "";
+}
+
+async function copyExtractedWordContent(content: string, successMessage: string) {
+  try {
+    await navigator.clipboard.writeText(content);
+    ElMessage.success(successMessage);
+  } catch {
+    ElMessage.warning("复制失败，请长按或选择文字后复制");
+  }
+}
+
+function getExtractedWordLines() {
+  return extractedEnglishWordText.value
+    .split(/\r?\n/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+}
+
+function copyAllExtractedWords() {
+  const words = getExtractedWordLines();
+  if (!words.length) return;
+  void copyExtractedWordContent(words.join("\n"), "已复制全部单词");
+}
+
+function applyExtractedWords() {
+  const words = getExtractedWordLines();
+  if (!words.length) {
+    convertSourceTextToWords();
+    return;
+  }
+
+  const generatedContent = words.join("\n");
+  if (wordExtractionTarget.value === "create") {
+    lessonForm.generatedContent = generatedContent;
+  } else {
+    lessonEditorForm.generatedContent = generatedContent;
+  }
+
+  ElMessage.success("已填入 " + words.length + " 个单词");
+}
+
 async function handleUpdateLesson() {
   const title = lessonEditorForm.title.trim();
   if (!title) {
@@ -938,17 +1292,23 @@ async function handleUpdateLesson() {
     return;
   }
 
-  const lesson = updateLesson(lessonEditorForm.lessonId, {
+  isUpdatingLesson.value = true;
+  const result = await updateLesson(lessonEditorForm.lessonId, {
     title,
     generatedContent,
     teacherText: lessonEditorForm.teacherText
+  }).finally(() => {
+    isUpdatingLesson.value = false;
   });
-  if (!lesson) {
-    ElMessage.warning("生成内容中没有识别到带中文翻译的单词或句子");
+  if (!result) {
+    ElMessage.warning("生成内容中没有识别到英文单词或句子");
     return;
   }
+  if (result.translationFailedCount) {
+    ElMessage.warning("有 " + result.translationFailedCount + " 条内容暂时未能自动翻译");
+  }
 
-  selectLesson(lesson.id);
+  selectLesson(result.lesson.id);
   lessonEditorOpen.value = false;
   await saveCurrentReviewState("复习日已更新并同步", "复习日已更新，本机暂存但云端未同步");
 }
@@ -1119,9 +1479,8 @@ function resetLessonForm() {
               class="reference-refresh-button"
               :icon="RefreshLeft"
               circle
-              :loading="isReferenceImageLoading"
-              aria-label="刷新参考图片"
-              @click="refreshReferenceImage"
+              aria-label="搜索并选择参考图片"
+              @click="openReferenceImagePicker"
             />
           </div>
 
@@ -1179,6 +1538,136 @@ function resetLessonForm() {
         </section>
       </aside>
     </section>
+
+    <el-dialog
+      v-model="referenceImagePickerOpen"
+      class="reference-image-picker-dialog"
+      title="选择参考图片"
+      width="min(92vw, 720px)"
+      append-to-body
+    >
+      <div class="reference-image-picker-toolbar">
+        <el-select
+          v-model="referenceImageSource"
+          aria-label="图片搜索来源"
+          @change="handleReferenceImageSourceChange"
+        >
+          <el-option
+            v-for="source in referenceImageSourceOptions"
+            :key="source.value"
+            :label="source.label"
+            :value="source.value"
+          />
+        </el-select>
+        <el-input
+          v-model="referenceImageSearchQuery"
+          clearable
+          aria-label="图片搜索关键词"
+          placeholder="输入英文图片关键词"
+          @keyup.enter="handleReferenceImageSearch"
+        >
+          <template #append>
+            <el-button
+              :icon="Search"
+              :loading="!isExternalReferenceImageSource && isReferenceImageSearching"
+              aria-label="搜索图片"
+              @click="handleReferenceImageSearch"
+            />
+          </template>
+        </el-input>
+      </div>
+
+      <div class="reference-image-picker-hint">
+        <span>
+          {{
+            isExternalReferenceImageSource
+              ? "该平台将在新页面打开当前关键词"
+              : `为 ${activeItem?.english} 选择一张清晰、易识别的图片`
+          }}
+        </span>
+        <el-button
+          v-if="!isExternalReferenceImageSource"
+          :icon="RefreshLeft"
+          text
+          :loading="isReferenceImageSearching"
+          @click="searchNextReferenceImageBatch"
+        >
+          换一批
+        </el-button>
+      </div>
+
+      <section
+        v-if="isExternalReferenceImageSource"
+        class="reference-image-external-search"
+      >
+        <strong>{{ currentReferenceImageSourceOption?.label }}</strong>
+        <p>
+          当前项目未配置此平台的直连服务。点击下面的按钮会携带当前关键词打开官方搜索页。
+        </p>
+        <el-button type="primary" :disabled="!currentExternalImageSearchUrl" @click="openExternalImageSearch">
+          打开图片搜索
+        </el-button>
+        <div class="reference-image-external-divider">
+          <span>找到图片后</span>
+        </div>
+        <div class="reference-image-url-picker">
+          <el-input
+            v-model="externalReferenceImageUrl"
+            clearable
+            placeholder="粘贴图片地址，例如 https://.../image.jpg"
+            aria-label="外部图片地址"
+            @keyup.enter="applyExternalReferenceImageUrl"
+          />
+          <el-button
+            type="primary"
+            :loading="Boolean(selectedReferenceImageUrl)"
+            :disabled="!externalReferenceImageUrl.trim()"
+            @click="applyExternalReferenceImageUrl"
+          >
+            使用此图片
+          </el-button>
+        </div>
+        <small>请在图片上选择“复制图片地址”，不要复制网页地址。</small>
+      </section>
+      <div v-else-if="isReferenceImageSearching" class="reference-image-candidate-grid">
+        <div v-for="index in 4" :key="index" class="reference-image-skeleton" />
+      </div>
+      <div
+        v-else-if="referenceImageCandidates.length"
+        class="reference-image-candidate-grid"
+      >
+        <button
+          v-for="candidate in referenceImageCandidates"
+          :key="candidate.url"
+          class="reference-image-candidate"
+          type="button"
+          :disabled="Boolean(selectedReferenceImageUrl)"
+          @click="selectReferenceImage(candidate)"
+        >
+          <img
+            :src="candidate.url"
+            :alt="candidate.title"
+            loading="lazy"
+            referrerpolicy="no-referrer"
+          />
+          <span class="reference-image-candidate-meta">
+            <strong>{{ candidate.title }}</strong>
+            <small>{{ candidate.sourceLabel }}</small>
+          </span>
+          <span
+            v-if="selectedReferenceImageUrl === candidate.url"
+            class="reference-image-selecting"
+          >
+            正在应用
+          </span>
+        </button>
+      </div>
+      <el-empty
+        v-else
+        :description="referenceImageSearchError || '暂时没有搜索结果'"
+        :image-size="72"
+      />
+    </el-dialog>
 
     <el-drawer
       v-model="dailyContentDrawerOpen"
@@ -1324,13 +1813,21 @@ function resetLessonForm() {
             </div>
 
             <el-form label-position="top" class="lesson-form settings-lesson-form">
-              <el-form-item label="生成内容">
+              <el-form-item>
+                <template #label>
+                  <span class="generated-content-label">
+                    <span>生成内容</span>
+                    <el-button text type="primary" @click="openWordExtractionDialog('create')">
+                      转换
+                    </el-button>
+                  </span>
+                </template>
                 <el-input
                   v-model="lessonForm.generatedContent"
                   type="textarea"
                   :rows="10"
                   resize="none"
-                  placeholder="请输入要生成复习内容的中英文内容&#10;&#10;例如：&#10;zero 数字0&#10;I see a zebra.（我看到一只斑马。）"
+                  placeholder="每行输入一个英文单词或句子，中文会自动翻译&#10;&#10;例如：&#10;yuan&#10;How much is it?&#10;It is five yuan."
                 />
               </el-form-item>
               <el-form-item label="老师发来的内容（辅助显示）">
@@ -1342,7 +1839,12 @@ function resetLessonForm() {
                   placeholder="可选：粘贴老师发来的完整课堂内容"
                 />
               </el-form-item>
-              <el-button class="settings-save-button" type="primary" @click="handleCreateLesson">
+              <el-button
+                class="settings-save-button"
+                type="primary"
+                :loading="isCreatingLesson"
+                @click="handleCreateLesson"
+              >
                 保存复习日
               </el-button>
             </el-form>
@@ -1441,13 +1943,21 @@ function resetLessonForm() {
             placeholder="请输入复习日标题"
           />
         </el-form-item>
-        <el-form-item label="生成内容">
+        <el-form-item>
+          <template #label>
+            <span class="generated-content-label">
+              <span>生成内容</span>
+              <el-button text type="primary" @click="openWordExtractionDialog('edit')">
+                转换
+              </el-button>
+            </span>
+          </template>
           <el-input
             v-model="lessonEditorForm.generatedContent"
             type="textarea"
             :rows="10"
             resize="none"
-            placeholder="请输入带中英文翻译的单词或句子"
+            placeholder="每行输入一个英文单词或句子，中文会自动翻译"
           />
         </el-form-item>
         <el-form-item label="老师发来的内容（辅助显示）">
@@ -1462,7 +1972,67 @@ function resetLessonForm() {
       </el-form>
       <template #footer>
         <el-button @click="lessonEditorOpen = false">取消</el-button>
-        <el-button type="primary" @click="handleUpdateLesson">保存修改</el-button>
+        <el-button type="primary" :loading="isUpdatingLesson" @click="handleUpdateLesson">
+          保存修改
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="wordExtractionDialogOpen"
+      class="word-extraction-dialog"
+      title="从原文提取单词"
+      width="min(92vw, 560px)"
+      append-to-body
+    >
+      <p class="word-extraction-description">
+        粘贴包含中英文、标点或段落的原文，系统会提取英文单词、自动去重，并按一行一个写入生成内容。
+      </p>
+      <el-input
+        v-model="wordExtractionSourceText"
+        type="textarea"
+        :rows="12"
+        resize="none"
+        placeholder="请粘贴需要提取单词的原文本"
+        autofocus
+        @input="handleWordExtractionSourceInput"
+      />
+      <div class="word-extraction-action">
+        <el-button type="primary" plain @click="convertSourceTextToWords">
+          开始转换
+        </el-button>
+      </div>
+
+      <section
+        v-if="extractedEnglishWordText"
+        class="word-extraction-result"
+        aria-label="提取结果"
+      >
+        <header class="word-extraction-result-header">
+          <span>已提取 {{ extractedEnglishWordCount }} 个单词，可直接编辑</span>
+          <el-button text type="primary" @click="copyAllExtractedWords">
+            复制全部
+          </el-button>
+        </header>
+        <el-input
+          v-model="extractedEnglishWordText"
+          class="word-extraction-result-input"
+          type="textarea"
+          :rows="9"
+          resize="vertical"
+          spellcheck="false"
+          placeholder="转换后的单词会显示在这里，每行一个"
+        />
+      </section>
+      <template #footer>
+        <el-button @click="wordExtractionDialogOpen = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!extractedEnglishWordText.trim()"
+          @click="applyExtractedWords"
+        >
+          填入生成内容
+        </el-button>
       </template>
     </el-dialog>
   </main>

@@ -39,7 +39,11 @@ interface SaveRemoteReviewStatePayload {
   payload: ReviewSyncPayload;
 }
 
-const reviewStateEndpoint = String(import.meta.env.VITE_REVIEW_SYNC_URL || "").trim();
+const configuredReviewStateEndpoint = String(import.meta.env.VITE_REVIEW_SYNC_URL || "").trim();
+const reviewStateEndpoint =
+  import.meta.env.DEV && configuredReviewStateEndpoint
+    ? "/api/review-state"
+    : configuredReviewStateEndpoint;
 export const reviewEditCodeStorageKey = "vancy-review-edit-code-v1";
 
 export function getStoredReviewEditCode() {

@@ -72,6 +72,24 @@ export function dedupeReviewItems(items: ReviewItem[]) {
   });
 }
 
+export function assignContextualEmojis(items: ReviewItem[]) {
+  const wordItems = items.filter(
+    (item) =>
+      item.category === "word" && item.emoji && !["🔊", "📝", "💬"].includes(item.emoji)
+  );
+
+  return items.map((item) => {
+    if (item.emoji && !["🔊", "📝", "💬"].includes(item.emoji)) return item;
+
+    const normalizedEnglish = item.english.toLocaleLowerCase();
+    const relatedWord = wordItems.find((wordItem) =>
+      normalizedEnglish.includes(wordItem.english.toLocaleLowerCase())
+    );
+
+    return relatedWord ? { ...item, emoji: relatedWord.emoji } : item;
+  });
+}
+
 export function isLetterTitleReviewItem(item: Pick<ReviewItem, "english" | "category">) {
   return item.category === "letter" && /^letter\s+[a-z]{1,2}$/i.test(item.english.trim());
 }
@@ -410,18 +428,32 @@ export const seedReviewLessons: ReviewLesson[] = [
 ];
 
 export function parseReviewText(rawText: string) {
-  const parsed = rawText
-    .split(/\n|；|;/)
-    .flatMap((line) => line.split(/\s+\/\s+/))
-    .flatMap((line) => parseReviewLine(line))
-    .filter(
-      (item) =>
-        Boolean(item.english) &&
-        Boolean(item.chinese.trim()) &&
-        (item.category === "word" || item.category === "sentence")
-    );
+  let currentCategory: ReviewItemCategory | undefined;
+  const parsed = rawText.split(/\r?\n/).flatMap((line) => {
+    const heading = cleanLine(line).replace(/[：:]$/g, "").trim();
+    if (/^(words?|单词)$/i.test(heading)) {
+      currentCategory = "word";
+      return [];
+    }
+    if (/^(sentences?|句子)$/i.test(heading)) {
+      currentCategory = "sentence";
+      return [];
+    }
 
-  return dedupeReviewItems(parsed);
+    return parseReviewLine(line).map((item) => ({
+      ...item,
+      category: currentCategory || item.category
+    }));
+  });
+
+  return assignContextualEmojis(
+    dedupeReviewItems(
+      parsed.filter(
+        (item) =>
+          Boolean(item.english) && (item.category === "word" || item.category === "sentence")
+      )
+    )
+  );
 }
 
 function parseReviewLine(line: string): ReviewItem[] {
@@ -551,7 +583,11 @@ function pickEmoji(english: string, chinese: string) {
     [/zebra|斑马/, "🦓"],
     [/zipper|拉链/, "🧥"],
     [/letter|字母/, "🔤"],
-    [/number|数字/, "🔢"]
+    [/number|数字/, "🔢"],
+    [/yuan|rmb|money|price|how much|元|人民币|钱|价格/, "💰"]
   ];
-  return emojiMap.find(([pattern]) => pattern.test(text))?.[1] || "🔊";
+  const matchedEmoji = emojiMap.find(([pattern]) => pattern.test(text))?.[1];
+  if (matchedEmoji) return matchedEmoji;
+
+  return inferCategory(english) === "sentence" ? "💬" : "📝";
 }

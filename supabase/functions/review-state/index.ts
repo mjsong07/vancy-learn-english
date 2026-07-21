@@ -10,8 +10,8 @@ const stateId = "default";
 const tableName = "review_shared_state";
 const defaultAllowedOrigins = [
   "https://mjsong07.github.io",
-  "http://127.0.0.1:5173",
-  "http://localhost:5173"
+  "https://127.0.0.1:5173",
+  "https://localhost:5173"
 ];
 
 Deno.serve(async (request) => {

@@ -1,5 +1,6 @@
 import { computed, ref, watch } from "vue";
 import {
+  assignContextualEmojis,
   buildReviewItem,
   createReviewId,
   dedupeReviewItems,
@@ -13,6 +14,7 @@ import {
   sanitizeReviewText,
   seedReviewLessons
 } from "../data/reviewLessons";
+import { translateReviewItems } from "../services/translation";
 import type { ReviewItem, ReviewLesson } from "../types/review";
 
 function cloneSeedLessons() {
@@ -74,7 +76,14 @@ function normalizeLessonItems(items: ReviewItem[] | undefined, fallbackItems: Re
     emoji: sanitizeReviewText(item.emoji || ""),
     note: sanitizeReviewText(item.note || "")
   }));
-  const dedupedItems = dedupeReviewItems(sanitizedItems);
+  const refreshedItems = sanitizedItems.map((item) => {
+    if (item.emoji && !["🔊", "📝", "💬"].includes(item.emoji)) return item;
+    return {
+      ...item,
+      emoji: buildReviewItem(item.english, item.chinese, item.note, item.category).emoji
+    };
+  });
+  const dedupedItems = assignContextualEmojis(dedupeReviewItems(refreshedItems));
   return dedupedItems.length ? dedupedItems : fallbackItems;
 }
 
@@ -243,16 +252,31 @@ export function useReviewLessons() {
     setActiveIndex(activeIndex.value - 1);
   }
 
-  function addLesson(payload: { generatedContent: string; teacherText: string }) {
+  async function addLesson(payload: { generatedContent: string; teacherText: string }) {
     const generatedContent = payload.generatedContent.trim();
     const teacherText = payload.teacherText.trim();
     const parsedItems = parseReviewText(generatedContent);
     if (!parsedItems.length) return null;
+    const translationResult = await translateReviewItems(parsedItems);
+    const translatedItems = assignContextualEmojis(
+      translationResult.items.map((item) => {
+        if (item.emoji && !["🔊", "📝", "💬"].includes(item.emoji)) return item;
+        return {
+          ...item,
+          emoji: buildReviewItem(
+            item.english,
+            item.chinese,
+            item.note,
+            item.category
+          ).emoji
+        };
+      })
+    );
 
     const now = new Date();
     const dateLabel = `${now.getMonth() + 1}月${now.getDate()}日`;
-    const wordCount = parsedItems.filter((item) => item.category === "word").length;
-    const sentenceCount = parsedItems.filter((item) => item.category === "sentence").length;
+    const wordCount = translatedItems.filter((item) => item.category === "word").length;
+    const sentenceCount = translatedItems.filter((item) => item.category === "sentence").length;
     const lesson: ReviewLesson = {
       id: createReviewId("lesson"),
       title: `${dateLabel}复习`,
@@ -262,15 +286,15 @@ export function useReviewLessons() {
       teacherText,
       generatedContent,
       dailyContent: teacherText || generatedContent,
-      items: parsedItems
+      items: translatedItems
     };
     lessons.value = [lesson, ...lessons.value];
     activeLessonId.value = lesson.id;
     progressMap.value = { ...progressMap.value, [lesson.id]: 0 };
-    return lesson;
+    return { lesson, translationFailedCount: translationResult.failedCount };
   }
 
-  function updateLesson(
+  async function updateLesson(
     lessonId: string,
     payload: { title: string; generatedContent: string; teacherText: string }
   ) {
@@ -279,9 +303,24 @@ export function useReviewLessons() {
     const teacherText = payload.teacherText.trim();
     const parsedItems = parseReviewText(generatedContent);
     if (!parsedItems.length) return null;
+    const translationResult = await translateReviewItems(parsedItems);
+    const translatedItems = assignContextualEmojis(
+      translationResult.items.map((item) => {
+        if (item.emoji && !["🔊", "📝", "💬"].includes(item.emoji)) return item;
+        return {
+          ...item,
+          emoji: buildReviewItem(
+            item.english,
+            item.chinese,
+            item.note,
+            item.category
+          ).emoji
+        };
+      })
+    );
 
-    const wordCount = parsedItems.filter((item) => item.category === "word").length;
-    const sentenceCount = parsedItems.filter((item) => item.category === "sentence").length;
+    const wordCount = translatedItems.filter((item) => item.category === "word").length;
+    const sentenceCount = translatedItems.filter((item) => item.category === "sentence").length;
     const currentLesson = lessons.value.find((lesson) => lesson.id === lessonId);
     if (!currentLesson) return null;
 
@@ -292,13 +331,13 @@ export function useReviewLessons() {
       teacherText,
       generatedContent,
       dailyContent: teacherText || generatedContent,
-      items: parsedItems
+      items: translatedItems
     };
     lessons.value = lessons.value.map((lesson) =>
       lesson.id === lessonId ? updatedLesson : lesson
     );
     progressMap.value = { ...progressMap.value, [lessonId]: 0 };
-    return updatedLesson;
+    return { lesson: updatedLesson, translationFailedCount: translationResult.failedCount };
   }
 
   function addItemToActiveLesson(english: string, chinese: string) {
