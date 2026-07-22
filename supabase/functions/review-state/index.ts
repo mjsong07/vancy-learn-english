@@ -133,18 +133,18 @@ async function uploadReferenceImage(
     return jsonResponse({ error: "Invalid edit code" }, 401, responseHeaders);
   }
 
-  const imageBytes = decodeWebpDataUrl(body.dataUrl);
-  if (!imageBytes) {
-    return jsonResponse({ error: "Invalid WebP image" }, 400, responseHeaders);
+  const image = decodeImageDataUrl(body.dataUrl);
+  if (!image) {
+    return jsonResponse({ error: "Invalid image" }, 400, responseHeaders);
   }
-  if (imageBytes.byteLength > maxReferenceImageBytes) {
+  if (image.bytes.byteLength > maxReferenceImageBytes) {
     return jsonResponse({ error: "Image is too large" }, 413, responseHeaders);
   }
 
-  const path = `reference-images/${Date.now()}-${crypto.randomUUID()}.webp`;
-  const { error } = await supabase.storage.from(referenceImageBucket).upload(path, imageBytes, {
+  const path = `reference-images/${Date.now()}-${crypto.randomUUID()}.${image.extension}`;
+  const { error } = await supabase.storage.from(referenceImageBucket).upload(path, image.bytes, {
     cacheControl: "31536000",
-    contentType: "image/webp",
+    contentType: image.contentType,
     upsert: false
   });
   if (error) {
@@ -225,20 +225,25 @@ function safeEqual(left: string, right: string) {
   return difference === 0;
 }
 
-function decodeWebpDataUrl(dataUrl: string) {
-  const match = dataUrl.match(/^data:image\/webp;base64,([A-Za-z0-9+/=]+)$/);
+function decodeImageDataUrl(dataUrl: string) {
+  const match = dataUrl.match(/^data:image\/(webp|jpeg|png);base64,([A-Za-z0-9+/=]+)$/);
   if (!match) return null;
 
   try {
-    const binary = atob(match[1]);
-    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const imageType = match[1] as "webp" | "jpeg" | "png";
+    const binary = atob(match[2]);
+    return {
+      bytes: Uint8Array.from(binary, (character) => character.charCodeAt(0)),
+      contentType: `image/${imageType}`,
+      extension: imageType === "jpeg" ? "jpg" : imageType
+    };
   } catch {
     return null;
   }
 }
 
 function isReferenceImagePath(path: string) {
-  return /^reference-images\/[0-9]+-[0-9a-f-]+\.webp$/i.test(path);
+  return /^reference-images\/[0-9]+-[0-9a-f-]+\.(webp|jpg|png)$/i.test(path);
 }
 
 function jsonResponse(body: unknown, status: number, headers: Record<string, string>) {

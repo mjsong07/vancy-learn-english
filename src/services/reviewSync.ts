@@ -139,8 +139,12 @@ export async function uploadReferenceImage(payload: UploadReferenceImagePayload)
     throw new ReviewSyncError("unauthorized", "家庭编辑码不正确");
   }
 
-  if (response.status === 400 || response.status === 413) {
-    throw new ReviewSyncError("invalid", "图片格式不正确或文件过大");
+  if (response.status === 400) {
+    throw new ReviewSyncError("invalid", "图片格式不正确");
+  }
+
+  if (response.status === 413) {
+    throw new ReviewSyncError("invalid", "图片文件过大");
   }
 
   if (!response.ok) {

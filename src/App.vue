@@ -1119,7 +1119,10 @@ function compressLocalReferenceImage(file: File) {
 
       context.drawImage(image, 0, 0, width, height);
       URL.revokeObjectURL(objectUrl);
-      const result = canvas.toDataURL("image/webp", 0.72);
+      const webpResult = canvas.toDataURL("image/webp", 0.72);
+      const result = webpResult.startsWith("data:image/webp;base64,")
+        ? webpResult
+        : canvas.toDataURL("image/jpeg", 0.72);
       if (!result || result.length > 900_000) {
         reject(new Error("Compressed image is too large"));
         return;
@@ -1443,6 +1446,23 @@ async function handleUpdateLesson() {
 function openSettings(section: SettingsSection = "lessons") {
   settingsSection.value = section;
   settingsDrawerOpen.value = true;
+}
+
+function handleSettingsSegmentedClick(event: MouseEvent) {
+  const target = event.target;
+  if (!(target instanceof Element) || settingsSection.value !== "lessons") return;
+
+  const selectedItem = target.closest(".el-segmented__item.is-selected");
+  if (selectedItem) settingsDrawerOpen.value = false;
+}
+
+function handleSettingsLessonClick(lessonId: string) {
+  if (lessonId === activeLessonId.value) {
+    settingsDrawerOpen.value = false;
+    return;
+  }
+
+  selectLesson(lessonId);
 }
 
 function handleSelectItem(itemIndex: number) {
@@ -1876,6 +1896,7 @@ function resetLessonForm() {
             v-model="settingsSection"
             class="review-settings-segmented"
             :options="settingsOptions"
+            @click="handleSettingsSegmentedClick"
           />
         </div>
 
@@ -1896,7 +1917,7 @@ function resetLessonForm() {
                 <button
                   class="settings-lesson-main"
                   type="button"
-                  @click="selectLesson(lesson.id)"
+                  @click="handleSettingsLessonClick(lesson.id)"
                 >
                   <span class="settings-lesson-icon">
                     <el-icon><Calendar /></el-icon>
