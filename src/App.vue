@@ -1550,6 +1550,15 @@ function resetLessonForm() {
       <section class="phone-stage" aria-label="发音复习卡">
         <div class="review-top-actions" aria-label="课程切换与复习设置">
           <button
+            class="course-mini-button review-list-button"
+            type="button"
+            aria-label="复习设置"
+            @click="openSettings()"
+          >
+            <el-icon><Edit /></el-icon>
+          </button>
+
+          <button
             class="course-switch-button previous-course-button"
             type="button"
             aria-label="上一课程"
@@ -1557,17 +1566,6 @@ function resetLessonForm() {
             @click="switchToPreviousLesson"
           >
             <el-icon><ArrowLeft /></el-icon>
-          </button>
-
-          <button class="review-settings-trigger" type="button" @click="openSettings()">
-            <span class="settings-trigger-icon">
-              <el-icon><Setting /></el-icon>
-            </span>
-            <span class="settings-trigger-copy">
-              <span>复习设置</span>
-              <strong>{{ activeLesson.title }} · {{ activeLesson.items.length }} 项</strong>
-            </span>
-            <el-icon class="settings-trigger-arrow"><ArrowRight /></el-icon>
           </button>
 
           <button
@@ -1578,6 +1576,15 @@ function resetLessonForm() {
             @click="switchToNextLesson"
           >
             <el-icon><ArrowRight /></el-icon>
+          </button>
+
+          <button
+            class="review-settings-button"
+            type="button"
+            aria-label="打开复习设置"
+            @click="openSettings()"
+          >
+            <el-icon><Setting /></el-icon>
           </button>
         </div>
 
