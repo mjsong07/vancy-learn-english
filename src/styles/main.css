@@ -841,19 +841,55 @@ textarea {
   font-size: 1.1rem;
 }
 
-.review-settings-trigger {
+.review-top-actions {
   position: fixed;
   top: calc(8px + env(safe-area-inset-top));
   left: 50%;
   z-index: 30;
   display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+  width: min(calc(100vw - 22px), 464px);
+  transform: translateX(-50%);
+}
+
+.course-switch-button,
+.review-settings-trigger {
+  height: 52px;
+  min-height: 52px;
+}
+
+.course-switch-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(47, 102, 239, 0.38);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--primary);
+  box-shadow: 0 10px 24px rgba(57, 87, 123, 0.12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.course-switch-button:hover:not(:disabled) {
+  border-color: rgba(47, 102, 239, 0.62);
+  background: #edf5ff;
+}
+
+.course-switch-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.review-settings-trigger {
+  display: grid;
   flex: 0 0 52px;
   grid-template-columns: 32px minmax(0, 1fr) 18px;
   gap: 8px;
   align-items: center;
-  width: min(calc(100vw - 36px), 394px);
-  height: 52px;
-  min-height: 52px;
+  width: 100%;
   margin-bottom: 10px;
   padding: 7px 10px;
   border: 1px solid rgba(47, 102, 239, 0.38);
@@ -862,7 +898,6 @@ textarea {
   color: var(--primary);
   box-shadow: 0 10px 24px rgba(57, 87, 123, 0.12);
   text-align: left;
-  transform: translateX(-50%);
   cursor: pointer;
 }
 

@@ -58,6 +58,25 @@ const {
   replaceLessons
 } = useReviewLessons();
 
+const currentLessonIndex = computed(() => {
+  return lessons.value.findIndex((lesson) => lesson.id === activeLessonId.value);
+});
+
+const canSwitchToPreviousLesson = computed(() => currentLessonIndex.value > 0);
+const canSwitchToNextLesson = computed(() => currentLessonIndex.value >= 0 && currentLessonIndex.value < lessons.value.length - 1);
+
+function switchToPreviousLesson() {
+  if (!canSwitchToPreviousLesson.value) return;
+  const previousLessonId = lessons.value[currentLessonIndex.value - 1]?.id;
+  if (previousLessonId) selectLesson(previousLessonId);
+}
+
+function switchToNextLesson() {
+  if (!canSwitchToNextLesson.value) return;
+  const nextLessonId = lessons.value[currentLessonIndex.value + 1]?.id;
+  if (nextLessonId) selectLesson(nextLessonId);
+}
+
 type SettingsSection = "lessons" | "add" | "learning";
 type ReferenceImageStatus = "idle" | "loading" | "error";
 type ReferenceDisplayMode = "emoji" | "image";
@@ -1529,16 +1548,38 @@ function resetLessonForm() {
   <main class="kid-review-app">
     <section v-if="activeLesson && activeItem" class="review-workspace" aria-live="polite">
       <section class="phone-stage" aria-label="发音复习卡">
-        <button class="review-settings-trigger" type="button" @click="openSettings()">
-          <span class="settings-trigger-icon">
-            <el-icon><Setting /></el-icon>
-          </span>
-          <span class="settings-trigger-copy">
-            <span>复习设置</span>
-            <strong>{{ activeLesson.title }} · {{ activeLesson.items.length }} 项</strong>
-          </span>
-          <el-icon class="settings-trigger-arrow"><ArrowRight /></el-icon>
-        </button>
+        <div class="review-top-actions" aria-label="课程切换与复习设置">
+          <button
+            class="course-switch-button previous-course-button"
+            type="button"
+            aria-label="上一课程"
+            :disabled="!canSwitchToPreviousLesson"
+            @click="switchToPreviousLesson"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+          </button>
+
+          <button class="review-settings-trigger" type="button" @click="openSettings()">
+            <span class="settings-trigger-icon">
+              <el-icon><Setting /></el-icon>
+            </span>
+            <span class="settings-trigger-copy">
+              <span>复习设置</span>
+              <strong>{{ activeLesson.title }} · {{ activeLesson.items.length }} 项</strong>
+            </span>
+            <el-icon class="settings-trigger-arrow"><ArrowRight /></el-icon>
+          </button>
+
+          <button
+            class="course-switch-button next-course-button"
+            type="button"
+            aria-label="下一课程"
+            :disabled="!canSwitchToNextLesson"
+            @click="switchToNextLesson"
+          >
+            <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
 
         <el-progress
           class="review-progress"
