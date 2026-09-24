@@ -844,21 +844,66 @@ textarea {
 .review-top-actions {
   position: relative;
   z-index: 30;
-  display: grid;
-  grid-template-columns: 44px 44px 44px 52px;
-  gap: 8px;
-  align-items: center;
   width: 100%;
   margin: 0 auto 12px;
+}
+
+.lesson-header-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 16px 12px 12px;
+  border: 1px solid rgba(31, 74, 68, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #1d5f5b, #1d5b59 38%, #244f58);
+  box-shadow: 0 12px 28px rgba(18, 42, 49, 0.16);
+}
+
+.lesson-header-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  color: #eef9ff;
+}
+
+.lesson-header-copy h2 {
+  margin: 0;
+  overflow: hidden;
+  color: #f8feff;
+  font-size: 1.05rem;
+  font-weight: 950;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-header-copy span {
+  color: rgba(238, 249, 255, 0.8);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.lesson-header-tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .course-mini-button,
 .course-switch-button,
 .review-settings-button {
-  height: 44px;
-  min-height: 44px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  box-shadow: 0 8px 18px rgba(33, 59, 77, 0.12);
+  display: grid;
+  place-items: center;
+  height: 36px;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 18px rgba(24, 54, 63, 0.14);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
@@ -867,46 +912,34 @@ textarea {
 .course-switch-button:hover:not(:disabled),
 .review-settings-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(33, 59, 77, 0.14);
+  box-shadow: 0 10px 22px rgba(24, 54, 63, 0.18);
 }
 
-.course-mini-button {
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #f3f8ff;
-}
-
+.course-mini-button,
 .course-switch-button {
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border-radius: 12px;
+  width: 36px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.14);
-  color: #f3f8ff;
+  color: #f8feff;
 }
 
 .course-switch-button:disabled {
-  opacity: 0.4;
+  opacity: 0.42;
   cursor: not-allowed;
 }
 
 .review-settings-button {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  margin-left: auto;
+  width: 42px;
   border: 0;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #f59d7a, #ef7a5d);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f6a681, #eb7c62);
   color: #fffaf7;
 }
 
 .review-settings-button .el-icon,
 .course-mini-button .el-icon,
 .course-switch-button .el-icon {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
 }
 
 .step-navigation {

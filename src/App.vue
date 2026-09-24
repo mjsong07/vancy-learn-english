@@ -1549,43 +1549,52 @@ function resetLessonForm() {
     <section v-if="activeLesson && activeItem" class="review-workspace" aria-live="polite">
       <section class="phone-stage" aria-label="发音复习卡">
         <div class="review-top-actions" aria-label="课程切换与复习设置">
-          <button
-            class="course-mini-button review-list-button"
-            type="button"
-            aria-label="复习设置"
-            @click="openSettings()"
-          >
-            <el-icon><Edit /></el-icon>
-          </button>
+          <div class="lesson-header-card">
+            <div class="lesson-header-copy">
+              <h2>{{ activeLesson.title }}</h2>
+              <span>{{ activeIndex + 1 }}/{{ activeLesson.items.length }}</span>
+            </div>
 
-          <button
-            class="course-switch-button previous-course-button"
-            type="button"
-            aria-label="上一课程"
-            :disabled="!canSwitchToPreviousLesson"
-            @click="switchToPreviousLesson"
-          >
-            <el-icon><ArrowLeft /></el-icon>
-          </button>
+            <div class="lesson-header-tools">
+              <button
+                class="course-mini-button review-list-button"
+                type="button"
+                aria-label="复习设置"
+                @click="openSettings()"
+              >
+                <el-icon><Edit /></el-icon>
+              </button>
 
-          <button
-            class="course-switch-button next-course-button"
-            type="button"
-            aria-label="下一课程"
-            :disabled="!canSwitchToNextLesson"
-            @click="switchToNextLesson"
-          >
-            <el-icon><ArrowRight /></el-icon>
-          </button>
+              <button
+                class="course-switch-button previous-course-button"
+                type="button"
+                aria-label="上一课程"
+                :disabled="!canSwitchToPreviousLesson"
+                @click="switchToPreviousLesson"
+              >
+                <el-icon><ArrowLeft /></el-icon>
+              </button>
 
-          <button
-            class="review-settings-button"
-            type="button"
-            aria-label="打开复习设置"
-            @click="openSettings()"
-          >
-            <el-icon><Setting /></el-icon>
-          </button>
+              <button
+                class="course-switch-button next-course-button"
+                type="button"
+                aria-label="下一课程"
+                :disabled="!canSwitchToNextLesson"
+                @click="switchToNextLesson"
+              >
+                <el-icon><ArrowRight /></el-icon>
+              </button>
+
+              <button
+                class="review-settings-button"
+                type="button"
+                aria-label="打开复习设置"
+                @click="openSettings()"
+              >
+                <el-icon><Setting /></el-icon>
+              </button>
+            </div>
+          </div>
         </div>
 
         <el-progress
